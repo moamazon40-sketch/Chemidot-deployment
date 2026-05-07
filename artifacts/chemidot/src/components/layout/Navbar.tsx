@@ -93,30 +93,52 @@ type FlyoutItem = { label: string; href: string; icon: React.ElementType; desc: 
 function FlyoutDropdown({ label, items }: { label: string; items: FlyoutItem[] }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const openMenu = () => {
+    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+    setOpen(true);
+  };
+
+  const scheduleClose = () => {
+    closeTimerRef.current = setTimeout(() => setOpen(false), 180);
+  };
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     };
     document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    return () => {
+      document.removeEventListener("mousedown", handler);
+      if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+    };
   }, []);
 
   return (
-    <div ref={ref} className="relative" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
+    <div ref={ref} className="relative" onMouseEnter={openMenu} onMouseLeave={scheduleClose}>
       <button
+        type="button"
         className={cn(
           "flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors py-1",
           open && "text-foreground"
         )}
+        aria-expanded={open}
+        aria-haspopup="menu"
         onClick={() => setOpen(o => !o)}
+        onFocus={openMenu}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") setOpen(false);
+        }}
       >
         {label}
         <ChevronDown className={cn("h-3.5 w-3.5 transition-transform duration-150", open && "rotate-180")} />
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 mt-2 w-72 bg-background border rounded-2xl shadow-xl z-50 p-2 overflow-hidden">
+        <div className="absolute top-full left-0 z-50 pt-2">
+          <div className="absolute left-0 top-0 h-3 w-full" />
+          <div className="w-72 bg-background border rounded-2xl shadow-xl p-2 overflow-hidden">
           {items.map(item => (
             <Link key={item.href} href={item.href} onClick={() => setOpen(false)}>
               <div className="flex items-start gap-3 p-3 rounded-xl hover:bg-muted transition-colors cursor-pointer group">
@@ -130,6 +152,7 @@ function FlyoutDropdown({ label, items }: { label: string; items: FlyoutItem[] }
               </div>
             </Link>
           ))}
+          </div>
         </div>
       )}
     </div>
