@@ -66,7 +66,11 @@ const authLimiter = rateLimit({
 app.use("/api/auth/login", authLimiter);
 app.use("/api/auth/register", authLimiter);
 
-app.use("/api/uploads", express.static(path.join(process.cwd(), "public", "uploads")));
+const uploadDir = process.env.VERCEL
+  ? "/tmp/uploads"
+  : path.join(process.cwd(), "public", "uploads");
+
+app.use("/api/uploads", express.static(uploadDir));
 app.use("/api", router);
 
 // Serve the built Chemidot frontend from the same Render service.

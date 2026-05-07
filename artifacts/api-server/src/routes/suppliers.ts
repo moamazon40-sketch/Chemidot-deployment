@@ -10,7 +10,9 @@ import multer from "multer";
 
 const router = Router();
 
-const uploadDir = path.join(process.cwd(), "public", "uploads");
+const uploadDir = process.env.VERCEL
+  ? "/tmp/uploads"
+  : path.join(process.cwd(), "public", "uploads");
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
 const ALLOWED_MIME_TYPES = new Set([
