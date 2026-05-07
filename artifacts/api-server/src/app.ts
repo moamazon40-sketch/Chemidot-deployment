@@ -1,7 +1,7 @@
 import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
 import helmet from "helmet";
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import pinoHttp from "pino-http";
 import path from "path";
 import fs from "fs";
@@ -9,6 +9,8 @@ import router from "./routes";
 import { logger } from "./lib/logger";
 
 const app: Express = express();
+
+app.set("trust proxy", 1);
 
 app.use(helmet({ contentSecurityPolicy: false }));
 
@@ -52,6 +54,7 @@ const globalLimiter = rateLimit({
   max: 300,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req) => ipKeyGenerator(req.ip ?? "127.0.0.1"),
   message: { message: "Too many requests, please try again later." },
 });
 app.use("/api", globalLimiter);
@@ -61,6 +64,7 @@ const authLimiter = rateLimit({
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req) => ipKeyGenerator(req.ip ?? "127.0.0.1"),
   message: { message: "Too many authentication attempts, please try again later." },
 });
 app.use("/api/auth/login", authLimiter);
