@@ -1,0 +1,155 @@
+{
+  "colorScheme": "light",
+  "fonts": [
+    {
+      "family": "Inter",
+      "role": "body"
+    },
+    {
+      "family": "Space Grotesk",
+      "role": "unknown"
+    }
+  ],
+  "colors": {
+    "primary": "#0000EE",
+    "secondary": "#E80F5B",
+    "accent": "#00A99D",
+    "background": "#FFFFFF",
+    "textPrimary": "#222C2E",
+    "link": "#00A99D"
+  },
+  "typography": {
+    "fontFamilies": {
+      "primary": "Inter",
+      "heading": "Inter"
+    },
+    "fontStacks": {
+      "heading": [
+        "__Space_Grotesk_c22fe1",
+        "__Space_Grotesk_Fallback_c22fe1"
+      ],
+      "body": [
+        "Inter",
+        "-apple-system",
+        "BlinkMacSystemFont",
+        "Segoe UI",
+        "Roboto",
+        "Helvetica Neue",
+        "Arial",
+        "sans-serif"
+      ],
+      "paragraph": [
+        "Inter",
+        "-apple-system",
+        "BlinkMacSystemFont",
+        "Segoe UI",
+        "Roboto",
+        "Helvetica Neue",
+        "Arial",
+        "sans-serif"
+      ]
+    },
+    "fontSizes": {
+      "h1": "42px",
+      "h2": "36px",
+      "body": "16px"
+    }
+  },
+  "spacing": {
+    "baseUnit": 4,
+    "borderRadius": "4px"
+  },
+  "components": {
+    "input": {
+      "background": "transparent",
+      "textColor": "#222C2E",
+      "borderColor": null,
+      "borderRadius": "0px",
+      "borderRadiusCorners": {
+        "topLeft": "0px",
+        "topRight": "0px",
+        "bottomRight": "0px",
+        "bottomLeft": "0px"
+      },
+      "shadow": "none"
+    },
+    "buttonPrimary": {
+      "background": "#00A99D",
+      "textColor": "#FFFFFF",
+      "borderRadius": "4px",
+      "borderRadiusCorners": {
+        "topLeft": "4px",
+        "topRight": "4px",
+        "bottomRight": "4px",
+        "bottomLeft": "4px"
+      },
+      "shadow": "none"
+    },
+    "buttonSecondary": {
+      "background": "#FBFBFB",
+      "textColor": "#222C2E",
+      "borderRadius": "0px",
+      "borderRadiusCorners": {
+        "topLeft": "0px",
+        "topRight": "0px",
+        "bottomRight": "0px",
+        "bottomLeft": "0px"
+      },
+      "shadow": "none"
+    }
+  },
+  "images": {
+    "favicon": "https://static.knowde.com/knowde-logo/favicon2.ico?v=2",
+    "ogImage": "File saved at: attached_assets/ogImage.bin",
+    "logoHref": "https://www.knowde.com/"
+  },
+  "__llm_logo_reasoning": {
+    "selectedIndex": 0,
+    "reasoning": "Selected #0 because it is the only candidate linking to the homepage, matching the favicon, and is visible in the header area.",
+    "confidence": 0.85,
+    "source": "llm"
+  },
+  "__llm_button_reasoning": {
+    "primary": {
+      "index": 0,
+      "text": "Sign Up for FREE",
+      "reasoning": "Button #0 has a vibrant green background (#00A99D), which is a strong indicator of a primary CTA. The text 'Sign Up for FREE' is action-oriented, making it the main call-to-action."
+    },
+    "secondary": {
+      "index": 1,
+      "text": "Product Families",
+      "reasoning": "Button #1 has a light background (#FBFBFB) and serves as a navigation element ('Product Families'), making it a suitable secondary button."
+    },
+    "confidence": 0.95
+  },
+  "personality": {
+    "tone": "professional",
+    "energy": "medium",
+    "targetAudience": "business professionals in the chemical industry"
+  },
+  "designSystem": {
+    "framework": "custom",
+    "componentLibrary": ""
+  },
+  "confidence": {
+    "buttons": 0.95,
+    "colors": 0.9,
+    "overall": 0.925
+  },
+  "__llm_metadata": {
+    "logoSelection": {
+      "llmCalled": true,
+      "llmSucceeded": true,
+      "finalSource": "llm",
+      "rawLogoSelection": {
+        "selectedLogoIndex": 0,
+        "selectedLogoReasoning": "Selected #0 because it is the only candidate linking to the homepage, matching the favicon, and is visible in the header area.",
+        "confidence": 0.85
+      }
+    },
+    "buttonClassification": {
+      "llmCalled": true,
+      "llmSucceeded": true
+    }
+  }
+}

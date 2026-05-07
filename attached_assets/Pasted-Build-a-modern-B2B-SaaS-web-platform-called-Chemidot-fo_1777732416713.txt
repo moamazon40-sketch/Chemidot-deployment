@@ -1,0 +1,720 @@
+Build a modern B2B SaaS web platform called “Chemidot” for the chemical and industrial materials industry.
+
+Chemidot is a digital B2B marketplace that connects chemical buyers, suppliers, manufacturers, and distributors across the Middle East, especially Saudi Arabia. The platform enables companies to source chemicals, compare suppliers, request quotations, place orders, and participate in collective bulk purchasing to reduce costs and optimize logistics.
+
+The platform should feel premium, enterprise-grade, investor-ready, and highly polished.
+
+IMPORTANT:
+The UI/UX inspiration should be similar to the modern industrial marketplace experience of Knowde, especially:
+
+* Product detail page structure
+* Marketplace browsing experience
+* Supplier presentation
+* Search experience
+* Modern enterprise design language
+
+Reference inspirations:
+
+* Product page:
+  [https://www.knowde.com/stores/braskem-america/products/braskem-america-gwax-50w](https://www.knowde.com/stores/braskem-america/products/braskem-america-gwax-50w)
+
+* Marketplace page:
+  [https://www.knowde.com/marketplace](https://www.knowde.com/marketplace)
+
+DO NOT clone or copy the design exactly.
+Instead:
+
+* Create an original experience inspired by the same modern B2B marketplace style
+* Use unique layouts, spacing, interactions, branding, and colors
+* Simplify unnecessary complexity
+* Improve usability where possible
+* Make Chemidot feel like its own premium startup
+
+==================================================
+TECH STACK
+==========
+
+Frontend:
+
+* Next.js
+* React
+* TypeScript
+* Tailwind CSS
+
+Backend:
+
+* Node.js
+* Express.js
+
+Database:
+
+* PostgreSQL
+
+Authentication:
+
+* JWT authentication
+* Role-based access control
+
+Additional:
+
+* Responsive design
+* SEO optimization
+* Dark/light mode
+* Arabic + English support
+* RTL support
+* Scalable architecture
+* Clean modular codebase
+
+==================================================
+USER TYPES
+==========
+
+1. Buyers
+2. Suppliers
+3. Admins
+
+==================================================
+LANDING PAGE
+============
+
+Create a highly modern homepage with:
+
+* Hero section
+* Large search bar
+* Headline:
+  “Source Chemicals Smarter”
+* CTA buttons:
+
+  * Get Started
+  * Become a Supplier
+* Marketplace statistics
+* Featured categories
+* How it works section
+* Benefits section
+* Testimonials
+* Trusted suppliers section
+* Featured products
+* Collective order highlights
+* Footer
+
+Chemical categories examples:
+
+* Industrial Chemicals
+* Petrochemicals
+* Solvents
+* Fertilizers
+* Water Treatment Chemicals
+* Specialty Chemicals
+* Laboratory Chemicals
+
+Design style:
+
+* Premium whitespace
+* Modern typography
+* Enterprise SaaS feel
+* Smooth animations
+* Minimalistic professional UI
+* Blue/green chemistry-inspired palette
+
+==================================================
+AUTHENTICATION
+==============
+
+Features:
+
+* Sign up
+* Login
+* Forgot password
+* Email verification
+* Role selection
+
+Buyer signup fields:
+
+* Company name
+* Industry
+* Country
+* Contact person
+* Email
+* Phone
+* Password
+
+Supplier signup fields:
+
+* Company profile
+* Commercial registration number
+* Product categories
+* MOQ
+* Certifications upload
+* Warehouse location
+
+==================================================
+MARKETPLACE PAGE
+================
+
+Build a modern marketplace browsing experience inspired by Knowde.
+
+==================================================
+MARKETPLACE HERO
+================
+
+Top section includes:
+
+* Large smart search bar
+* Search by:
+
+  * Product name
+  * CAS number
+  * Supplier
+  * Category
+
+Include:
+
+* Trending searches
+* Popular categories
+* Recommended products
+
+==================================================
+MARKETPLACE LAYOUT
+==================
+
+Desktop:
+
+* Left sidebar filters
+* Main products grid/list
+
+Filters:
+
+* Categories
+* Country
+* MOQ
+* Certifications
+* Delivery time
+* Supplier verification
+* Collective order eligible
+* Price range
+
+==================================================
+PRODUCT CARDS
+=============
+
+Each product card includes:
+
+* Product image
+* Product name
+* Supplier
+* Category
+* MOQ
+* Country
+* Short specifications
+* RFQ button
+* Collective order badge
+* Verified supplier badge
+
+Hover interactions:
+
+* Smooth animation
+* Quick preview
+* Save product
+* Compare product
+
+==================================================
+SEARCH EXPERIENCE
+=================
+
+Build premium search functionality:
+
+* Auto-complete
+* Suggested products
+* Suggested suppliers
+* Search history
+* Fast loading
+* Smart filtering
+* Similar product recommendations
+
+==================================================
+PRODUCT DETAIL PAGE
+===================
+
+Create a premium chemical product page inspired by Knowde product pages.
+
+==================================================
+PRODUCT HERO SECTION
+====================
+
+Include:
+
+* Product name
+* Chemical category
+* CAS number
+* Supplier/company name
+* Supplier verification badge
+* Main product image
+* Thumbnail gallery
+* Quick specifications
+* MOQ
+* Availability status
+* Delivery lead time
+* Country of origin
+
+Right side sticky inquiry card:
+
+* Request Quote button
+* Join Collective Order button
+* Quantity selector
+* Estimated delivery
+* Supplier response time
+* Save product button
+
+==================================================
+PRODUCT INFORMATION TABS
+========================
+
+Tabs:
+
+* Overview
+* Technical Specifications
+* SDS/MSDS Documents
+* Packaging
+* Applications
+* Logistics Information
+* Supplier Information
+* Reviews & Ratings
+
+Technical specifications examples:
+
+* Density
+* Melting point
+* Appearance
+* Purity
+* Viscosity
+* Flash point
+
+==================================================
+SUPPLIER PROFILE SECTION
+========================
+
+Include:
+
+* Company logo
+* Verification status
+* Years in business
+* Location
+* Certifications
+* Response rate
+* Average response time
+* Product count
+* Contact supplier button
+
+==================================================
+RELATED PRODUCTS
+================
+
+Show:
+
+* Similar chemicals
+* Alternative grades
+* Related supplier products
+* Recommended products
+
+Modern product cards with:
+
+* Image
+* Supplier
+* MOQ
+* Country
+* Quick RFQ button
+
+==================================================
+BUYER DASHBOARD
+===============
+
+Features:
+
+* Search chemicals
+* Request quotations
+* View supplier offers
+* Compare prices
+* Place orders
+* Track orders
+* Saved suppliers
+* Notifications
+* Messaging center
+* Collective orders participation
+
+Buyer can:
+
+* Create RFQ
+* Upload specifications PDF
+* Set quantity
+* Set delivery destination
+* Set delivery deadline
+* Receive multiple supplier quotations
+
+==================================================
+SUPPLIER DASHBOARD
+==================
+
+Features:
+
+* Manage products
+* Upload inventory
+* Receive RFQs
+* Submit quotations
+* Manage orders
+* Revenue tracking
+* Analytics
+* Customer management
+* Messaging center
+
+Supplier product fields:
+
+* Product name
+* CAS number
+* Description
+* MOQ
+* Pricing tiers
+* Product images
+* SDS/MSDS upload
+* Available quantity
+* Country of origin
+* Delivery time
+
+==================================================
+COLLECTIVE ORDER SYSTEM
+=======================
+
+IMPORTANT:
+This is one of Chemidot’s most important differentiators.
+
+Build an advanced collective purchasing system where multiple buyers combine purchasing demand into one large supplier order to unlock better pricing and optimize logistics.
+
+The system should feel modern, dynamic, collaborative, and enterprise-grade.
+
+==================================================
+COLLECTIVE ORDERS MARKETPLACE
+=============================
+
+Create a dedicated page showing active collective orders.
+
+Each order card displays:
+
+* Product image
+* Product name
+* Supplier
+* Current combined quantity
+* Target quantity
+* Participation percentage
+* Estimated discount unlocked
+* Time remaining
+* Number of buyers joined
+* Estimated savings
+* Delivery region
+* MOQ per participant
+
+Buttons:
+
+* View Details
+* Join Order
+
+==================================================
+DYNAMIC PRICING ENGINE
+======================
+
+Implement pricing logic:
+
+* Larger quantities unlock lower pricing tiers
+* Real-time discount calculations
+* Automatic pricing updates
+* Savings visualization
+
+Example:
+0–10 tons → base price
+10–50 tons → 5% discount
+50–100 tons → 12% discount
+100+ tons → custom pricing
+
+Display:
+
+* Current pricing tier
+* Next savings milestone
+* Quantity needed for next discount
+
+==================================================
+LIVE PARTICIPATION SYSTEM
+=========================
+
+When buyers join:
+
+* Progress updates instantly
+* Savings estimates update
+* Participation count updates
+* Notifications sent
+
+Display live activity:
+
+* “New buyer joined”
+* “Discount tier unlocked”
+* “Order almost complete”
+
+==================================================
+COLLECTIVE ORDER DETAILS PAGE
+=============================
+
+HEADER:
+
+* Product info
+* Supplier info
+* Deadline
+* Delivery timeline
+* Current pricing tier
+
+MAIN CONTENT:
+
+* Participation progress
+* Savings calculator
+* Quantity breakdown
+* Logistics optimization estimate
+* Delivery regions
+* Packaging options
+
+RIGHT SIDEBAR:
+
+* Join order form
+* Quantity input
+* Estimated price
+* Estimated savings
+* Delivery destination
+* Payment terms
+
+==================================================
+BUYER EXPERIENCE
+================
+
+Buyers can:
+
+* Join collective orders
+* Create collective orders
+* Invite companies
+* Track participation
+* View savings analytics
+* Withdraw before closing deadline
+
+==================================================
+SUPPLIER EXPERIENCE
+===================
+
+Suppliers can:
+
+* Enable collective ordering
+* Define discount tiers
+* Set minimum quantities
+* Set regions
+* Set deadlines
+* View demand analytics
+
+==================================================
+SMART MATCHING SYSTEM
+=====================
+
+Suggest collective orders based on:
+
+* Search history
+* RFQ history
+* Industry
+* Region
+* Purchasing patterns
+
+Example:
+“3 companies in Saudi Arabia are sourcing Sodium Hydroxide. Join and save 14%.”
+
+==================================================
+LOGISTICS OPTIMIZATION
+======================
+
+Estimate:
+
+* Shared freight savings
+* Consolidated shipping
+* Delivery batching
+* Reduced logistics costs
+* Carbon reduction estimates
+
+==================================================
+UI/UX FOR COLLECTIVE ORDERS
+===========================
+
+Use:
+
+* Animated progress bars
+* Live counters
+* Savings visualizations
+* Interactive pricing charts
+* Real-time participation updates
+
+The experience should make buyers feel:
+“We save more together.”
+
+==================================================
+MESSAGING & NOTIFICATIONS
+=========================
+
+Real-time chat between buyers and suppliers.
+
+Notifications:
+
+* RFQ updates
+* New quotations
+* Order updates
+* Collective order milestones
+* Payment reminders
+
+==================================================
+PAYMENT & TRANSACTION SYSTEM
+============================
+
+Support:
+
+* Bank transfer workflow
+* Invoice generation
+* Payment tracking
+* Escrow-ready architecture
+
+==================================================
+ANALYTICS & REPORTING
+=====================
+
+Dashboards with:
+
+* Procurement analytics
+* Supplier performance
+* Revenue charts
+* Order history
+* Savings analytics
+* Top products
+* Export to PDF/Excel
+
+==================================================
+ADMIN PANEL
+===========
+
+Admin dashboard manages:
+
+* Users
+* Suppliers verification
+* RFQs
+* Orders
+* Collective orders
+* Revenue
+* Analytics
+* Support tickets
+* Fraud detection
+
+Admins can:
+
+* Approve suppliers
+* Ban accounts
+* Edit products
+* View transactions
+* Manage featured listings
+
+==================================================
+DATABASE STRUCTURE
+==================
+
+Create scalable schema for:
+
+* Users
+* Companies
+* Products
+* RFQs
+* Quotations
+* Orders
+* CollectiveOrders
+* Messages
+* Notifications
+* Reviews
+* Transactions
+
+==================================================
+RESPONSIVENESS
+==============
+
+Must work perfectly on:
+
+* Desktop
+* Tablet
+* Mobile
+
+Mobile optimization:
+
+* Sticky RFQ button
+* Mobile bottom navigation
+* Filter drawer
+* Fast loading
+
+==================================================
+PERFORMANCE & QUALITY
+=====================
+
+Optimize:
+
+* Fast search
+* Lazy loading
+* Optimized images
+* SEO-ready pages
+* Secure backend
+* Modular scalable architecture
+
+The platform should feel:
+
+* Like a funded startup
+* Enterprise procurement software
+* Premium industrial marketplace
+* Modern and trustworthy
+
+Avoid:
+
+* Generic admin templates
+* Cheap UI
+* Basic CRUD dashboards
+* Alibaba-style clutter
+* Overcrowded layouts
+
+Focus heavily on:
+
+* Premium UI polish
+* Smooth UX
+* Modern animations
+* Enterprise-grade workflows
+* Procurement efficiency
+
+==================================================
+FUTURE-READY FEATURES
+=====================
+
+Prepare architecture for:
+
+* AI supplier recommendations
+* Carbon footprint tracking
+* ESG scoring
+* ERP integrations
+* API integrations
+* Smart procurement insights
+* Predictive demand forecasting
+
+==================================================
+DELIVERABLES
+============
+
+Generate:
+
+* Full frontend
+* Full backend API
+* Database models
+* Authentication system
+* Responsive dashboards
+* Modern UI components
+* Seed/sample data
+* Scalable folder structure
+
+The final platform should feel like a world-class modern B2B chemical procurement and collaborative sourcing marketplace.

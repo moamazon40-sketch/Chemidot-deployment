@@ -1,0 +1,114 @@
+You are a senior frontend engineer.
+
+I have an existing React + Vite project with the following structure:
+- Modular architecture (Modules/)
+- Reusable components (components/)
+- Redux for state management (Redux Slices/, store/)
+- API layer (services/, APIs/)
+- i18n multi-language support
+- Custom hooks (hooks/)
+- Shared utilities (utils/, shared/)
+
+Your task is to TRANSFORM this project into a new product while keeping the architecture clean and scalable.
+
+---
+
+🎯 OBJECTIVE:
+Refactor and customize the frontend into a NEW PROJECT with different business logic, while reusing as much of the core structure as possible.
+
+---
+
+🧱 RULES:
+
+1. DO NOT break the project structure.
+2. KEEP:
+   - components/
+   - hooks/
+   - utils/
+   - shared/
+   - i18n system
+3. REFACTOR:
+   - Modules/ → replace with new features
+   - Redux slices → adapt to new state
+   - APIs/services → replace endpoints
+4. REMOVE any old business-specific logic.
+
+---
+
+⚙️ TASKS:
+
+### 1. Clean Up
+- Remove all Chemidot-specific logic, names, and API endpoints
+- Rename variables, files, and functions to be generic or aligned with the new product
+
+---
+
+### 2. New Feature Modules
+Create new modules inside /Modules based on this structure:
+
+Each module should include:
+- UI components
+- Redux slice (if needed)
+- API calls
+- hooks (if needed)
+
+Example modules:
+- Auth (login/register)
+- Dashboard
+- User Profile
+- Main Feature (core product logic)
+
+---
+
+### 3. State Management
+- Refactor Redux slices to match new features
+- Keep store structure clean and scalable
+- Use async actions for API calls
+
+---
+
+### 4. API Layer
+- Centralize API calls inside /services
+- Use a clean API service pattern
+- Add error handling and loading states
+
+---
+
+### 5. UI/UX Improvements
+- Keep reusable components
+- Improve styling consistency
+- Make layout responsive
+
+---
+
+### 6. i18n
+- Keep translation system
+- Update text content for new product
+- Ensure all UI text uses translation keys
+
+---
+
+### 7. Code Quality
+- Use clean, readable, modular code
+- Avoid duplication
+- Use hooks for reusable logic
+
+---
+
+🚀 OPTIONAL IMPROVEMENTS:
+- Add role-based access system
+- Add loading skeletons
+- Add global error handling
+- Add theme support (dark/light)
+
+---
+
+📦 OUTPUT FORMAT:
+- Show updated folder structure
+- Provide key updated files (Modules, Redux slices, API services)
+- Explain major changes briefly
+
+---
+
+IMPORTANT:
+Act like you're preparing this codebase for a scalable startup product, not just a demo.

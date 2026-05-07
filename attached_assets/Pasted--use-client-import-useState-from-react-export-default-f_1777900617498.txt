@@ -1,0 +1,146 @@
+"use client";
+
+import { useState } from "react";
+
+export default function RFQForm() {
+  const [form, setForm] = useState({
+    productName: "",
+    casNumber: "",
+    category: "",
+    quantity: "",
+    unit: "",
+    packaging: "",
+    deliveryCity: "",
+    deliveryAddress: "",
+    requiredBy: "",
+    urgency: "",
+    targetPrice: "",
+    currency: "",
+    specs: "",
+    certifications: [],
+    sds: false,
+    attachments: null,
+    collectiveOrder: "no",
+    minQty: "",
+    discount: "",
+    closingDate: "",
+    fullName: "",
+    companyName: "",
+    email: "",
+    phone: "",
+  });
+
+  const handleChange = (e: any) => {
+    const { name, value, type, checked } = e.target;
+    setForm({
+      ...form,
+      [name]: type === "checkbox" ? checked : value,
+    });
+  };
+
+  const handleSubmit = (e: any) => {
+    e.preventDefault();
+    console.log("RFQ Submitted:", form);
+    alert("RFQ Sent Successfully");
+  };
+
+  return (
+    <div className="max-w-4xl mx-auto p-6">
+      <h1 className="text-2xl font-bold mb-6">Request for Quotation (RFQ)</h1>
+
+      <form onSubmit={handleSubmit} className="space-y-6">
+
+        {/* Product */}
+        <div className="p-4 border rounded-xl">
+          <h2 className="font-semibold mb-3">1. Product Information</h2>
+          <input name="productName" placeholder="Product / Chemical Name *" className="input" onChange={handleChange} />
+          <input name="casNumber" placeholder="CAS Number" className="input mt-2" onChange={handleChange} />
+          <input name="category" placeholder="Category" className="input mt-2" onChange={handleChange} />
+        </div>
+
+        {/* Order */}
+        <div className="p-4 border rounded-xl">
+          <h2 className="font-semibold mb-3">2. Order Details</h2>
+          <input name="quantity" placeholder="Quantity *" className="input" onChange={handleChange} />
+          <input name="unit" placeholder="Unit (KG / MT / L / Drum)" className="input mt-2" onChange={handleChange} />
+          <input name="packaging" placeholder="Packaging Type" className="input mt-2" onChange={handleChange} />
+        </div>
+
+        {/* Delivery */}
+        <div className="p-4 border rounded-xl">
+          <h2 className="font-semibold mb-3">3. Delivery Information</h2>
+          <input name="deliveryCity" placeholder="Delivery Destination *" className="input" onChange={handleChange} />
+          <input name="deliveryAddress" placeholder="Delivery Address" className="input mt-2" onChange={handleChange} />
+          <input name="requiredBy" placeholder="Required By (ASAP or date)" className="input mt-2" onChange={handleChange} />
+          <input name="urgency" placeholder="Urgency (Normal / Urgent / Critical)" className="input mt-2" onChange={handleChange} />
+        </div>
+
+        {/* Pricing */}
+        <div className="p-4 border rounded-xl">
+          <h2 className="font-semibold mb-3">4. Pricing</h2>
+          <input name="targetPrice" placeholder="Target Price" className="input" onChange={handleChange} />
+          <input name="currency" placeholder="Currency (SAR / USD)" className="input mt-2" onChange={handleChange} />
+        </div>
+
+        {/* Specs */}
+        <div className="p-4 border rounded-xl">
+          <h2 className="font-semibold mb-3">5. Technical Requirements</h2>
+          <textarea name="specs" placeholder="Technical Specifications" className="input h-24" onChange={handleChange} />
+        </div>
+
+        {/* Attachments */}
+        <div className="p-4 border rounded-xl">
+          <h2 className="font-semibold mb-3">6. Attachments</h2>
+          <input type="file" className="input" />
+        </div>
+
+        {/* Collective Order */}
+        <div className="p-4 border rounded-xl">
+          <h2 className="font-semibold mb-3">7. Collective Order</h2>
+
+          <select name="collectiveOrder" className="input" onChange={handleChange}>
+            <option value="no">No</option>
+            <option value="yes">Yes</option>
+          </select>
+
+          {form.collectiveOrder === "yes" && (
+            <div className="mt-3 space-y-2">
+              <input name="minQty" placeholder="Minimum Quantity Target" className="input" onChange={handleChange} />
+              <input name="discount" placeholder="Discount Expectation %" className="input" onChange={handleChange} />
+              <input name="closingDate" placeholder="Closing Date" className="input" onChange={handleChange} />
+            </div>
+          )}
+        </div>
+
+        {/* Contact */}
+        <div className="p-4 border rounded-xl">
+          <h2 className="font-semibold mb-3">8. Contact Details</h2>
+          <input name="fullName" placeholder="Full Name *" className="input" onChange={handleChange} />
+          <input name="companyName" placeholder="Company Name *" className="input mt-2" onChange={handleChange} />
+          <input name="email" placeholder="Email *" className="input mt-2" onChange={handleChange} />
+          <input name="phone" placeholder="Phone" className="input mt-2" onChange={handleChange} />
+        </div>
+
+        {/* Submit */}
+        <button
+          type="submit"
+          className="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold"
+        >
+          Send RFQ to Suppliers
+        </button>
+
+      </form>
+
+      {/* Tailwind helper styles */}
+      <style jsx>{`
+        .input {
+          width: 100%;
+          padding: 10px;
+          border: 1px solid #ddd;
+          border-radius: 10px;
+          outline: none;
+        }
+      `}</style>
+    </div>
+  );
+}

@@ -1,0 +1,59 @@
+Act as a Senior Full-Stack Engineer. Build a responsive React application using Tailwind CSS, Lucide-React for icons, and shadcn/ui for components. Focus on high-density data management for an industrial chemical marketplace."
+
+1. Layout & Sidebar Architecture:
+
+Sidebar: Create a fixed-width sidebar with a white background and a subtle right border.
+
+Branding: Include a placeholder logo and the brand name 'Chemidot'.
+
+User Profile: Below the branding, add a profile section with a circular avatar placeholder for 'Zeyad Amr' and a 'Supplier' badge.
+
+Navigation: A vertical menu containing: Dashboard, Settings, Products (highlighted as Active), Privacy Policy, and Logout.
+
+Header: In the main content area, include a 'Back' button and a prominent 'Add Product' heading.
+
+2. Navigation Tabs:
+
+Implement a Tab system to switch between 'Manual Entry' and 'Bulk Import'.
+
+3. Manual Entry Tab (Symmetric Grid Layout):
+
+Basic Information Section: Organize inputs into a perfectly symmetric 3-column grid.
+
+Input Fields:
+
+Row 1: Name (Text), Description (Text), Minimum Purity (Number/Percentage).
+
+Row 2: Minimum Quantity (Number), Maximum Quantity (Number), Appearance (Dropdown).
+
+Row 3: Categories (Dropdown), Deliver Countries (Dropdown/Multi-select), Incoterms (Dropdown).
+
+Row 4: Industries (Dropdown/Multi-select), Packaging (Dropdown), Units (Dropdown).
+
+Row 5: Substances (Searchable Dropdown/CAS Registry), Warehouses (Dropdown).
+
+Incoterms Logic: Populated with standard codes (EXW, FCA, CPT, CIP, DAP, DPU, DDP, FAS, FOB, CFR, CIF).
+
+Documentation Section: Include three vertically stacked outlined buttons for file uploads: 'Safety Data Sheet', 'Technical Data Sheet', and 'Additional Document'.
+
+Media: A large, central square dashed-border area for the 'Product Image' upload.
+
+Action: A large, dark navy 'Save' button at the bottom-right.
+
+4. Bulk Import Tab:
+
+Interface: A dedicated drag-and-drop file upload zone.
+
+Support: A button to 'Download CSV/Excel Template'.
+
+Workflow: After upload, generate a preview table of the first 5 rows to allow the user to verify data before saving.
+
+5. Visual Identity & Performance:
+
+Design: Use a light gray background for the page and a crisp white card for the form container.
+
+Symmetry: Maintain identical vertical and horizontal spacing (spacing-6 or 24px) between all grid elements.
+
+Typography: Use a clean, professional sans-serif font like Inter.
+
+Constraint: Do not include any fields related to color.

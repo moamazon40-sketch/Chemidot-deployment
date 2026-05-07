@@ -1,0 +1,125 @@
+"use client";
+
+import { collectiveOrders } from "../data/collectiveOrders";
+import { useState } from "react";
+
+export default function CollectiveOrdersPage() {
+  const [orders, setOrders] = useState(collectiveOrders);
+
+  function joinOrder(id: string) {
+    const updated = orders.map((o) =>
+      o.id === id
+        ? {
+            ...o,
+            currentQuantity: o.currentQuantity + 5,
+            participants: o.participants + 1,
+          }
+        : o
+    );
+
+    setOrders(updated);
+  }
+
+  return (
+    <div style={{ padding: 20, background: "#f8fafc", minHeight: "100vh" }}>
+      
+      <h1 style={{ fontSize: 24, fontWeight: "bold" }}>
+        Collective Orders Marketplace
+      </h1>
+
+      <p style={{ color: "#64748b", marginBottom: 20 }}>
+        Join group buying and unlock better prices
+      </p>
+
+      <div style={{ display: "grid", gap: 16 }}>
+        {orders.map((order) => {
+          const progress =
+            (order.currentQuantity / order.targetQuantity) * 100;
+
+          return (
+            <div
+              key={order.id}
+              style={{
+                background: "white",
+                padding: 16,
+                borderRadius: 12,
+                border: "1px solid #e2e8f0",
+              }}
+            >
+              {/* Header */}
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <div>
+                  <h2 style={{ fontSize: 18, fontWeight: 600 }}>
+                    {order.productName}
+                  </h2>
+                  <p style={{ fontSize: 12, color: "#64748b" }}>
+                    Supplier: {order.supplier}
+                  </p>
+                </div>
+
+                <div style={{ color: "green", fontWeight: "bold" }}>
+                  -{order.discount}%
+                </div>
+              </div>
+
+              {/* Progress */}
+              <div style={{ marginTop: 12 }}>
+                <div
+                  style={{
+                    height: 8,
+                    background: "#e2e8f0",
+                    borderRadius: 999,
+                  }}
+                >
+                  <div
+                    style={{
+                      width: `${progress}%`,
+                      height: 8,
+                      background: "#10b981",
+                      borderRadius: 999,
+                    }}
+                  />
+                </div>
+
+                <p style={{ fontSize: 12, marginTop: 6, color: "#64748b" }}>
+                  {order.currentQuantity} / {order.targetQuantity}{" "}
+                  {order.unit}
+                </p>
+              </div>
+
+              {/* Info */}
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  fontSize: 12,
+                  marginTop: 10,
+                  color: "#64748b",
+                }}
+              >
+                <span>{order.participants} buyers joined</span>
+                <span>{order.timeLeft}</span>
+              </div>
+
+              {/* Join Button */}
+              <button
+                onClick={() => joinOrder(order.id)}
+                style={{
+                  marginTop: 12,
+                  background: "#2563eb",
+                  color: "white",
+                  padding: "8px 12px",
+                  borderRadius: 8,
+                  border: "none",
+                  cursor: "pointer",
+                }}
+              >
+                Join Order
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}

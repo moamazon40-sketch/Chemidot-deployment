@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Chemidot"
+version = "1.0.0"
+id = "artifacts/chemidot"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 26149
+
+[services.development]
+run = "pnpm --filter @workspace/chemidot run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/chemidot", "run", "build" ]
+publicDir = "artifacts/chemidot/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "26149"
+BASE_PATH = "/"

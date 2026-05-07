@@ -1,0 +1,2367 @@
+openapi: 3.1.0
+info:
+  title: Api
+  version: 0.1.0
+  description: Chemidot B2B Chemical Marketplace API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: auth
+    description: Authentication
+  - name: products
+    description: Products/chemicals
+  - name: categories
+    description: Product categories
+  - name: suppliers
+    description: Supplier companies
+  - name: rfqs
+    description: Request for Quotation
+  - name: quotations
+    description: Quotation responses
+  - name: collective-orders
+    description: Collective ordering system
+  - name: orders
+    description: Orders
+  - name: messages
+    description: Messaging
+  - name: notifications
+    description: Notifications
+  - name: dashboard
+    description: Dashboard data
+  - name: admin
+    description: Admin operations
+  - name: reviews
+    description: Product reviews
+  - name: projects
+    description: Projects and case studies
+
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /auth/register:
+    post:
+      operationId: register
+      tags: [auth]
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterBody"
+      responses:
+        "201":
+          description: Registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginBody"
+      responses:
+        "200":
+          description: Logged in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /categories:
+    get:
+      operationId: listCategories
+      tags: [categories]
+      summary: List all categories
+      responses:
+        "200":
+          description: Categories list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Category"
+
+  /products:
+    get:
+      operationId: listProducts
+      tags: [products]
+      summary: List products with filters
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: categoryId
+          in: query
+          schema:
+            type: integer
+        - name: supplierId
+          in: query
+          schema:
+            type: integer
+        - name: country
+          in: query
+          schema:
+            type: string
+        - name: minMoq
+          in: query
+          schema:
+            type: number
+        - name: maxMoq
+          in: query
+          schema:
+            type: number
+        - name: minPrice
+          in: query
+          schema:
+            type: number
+        - name: maxPrice
+          in: query
+          schema:
+            type: number
+        - name: certifications
+          in: query
+          schema:
+            type: string
+        - name: collectiveEligible
+          in: query
+          schema:
+            type: boolean
+        - name: verifiedSupplier
+          in: query
+          schema:
+            type: boolean
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [newest, price_asc, price_desc, moq_asc, rating]
+      responses:
+        "200":
+          description: Products list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductsPage"
+    post:
+      operationId: createProduct
+      tags: [products]
+      summary: Create a product (supplier only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProductBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+
+  /products/featured:
+    get:
+      operationId: listFeaturedProducts
+      tags: [products]
+      summary: Get featured products for homepage
+      responses:
+        "200":
+          description: Featured products
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Product"
+
+  /products/trending:
+    get:
+      operationId: listTrendingSearches
+      tags: [products]
+      summary: Get trending searches and popular products
+      responses:
+        "200":
+          description: Trending data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrendingData"
+
+  /products/{id}:
+    get:
+      operationId: getProduct
+      tags: [products]
+      summary: Get a product by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Product detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductDetail"
+    put:
+      operationId: updateProduct
+      tags: [products]
+      summary: Update a product
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProductBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+    delete:
+      operationId: deleteProduct
+      tags: [products]
+      summary: Delete a product
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /products/{id}/related:
+    get:
+      operationId: getRelatedProducts
+      tags: [products]
+      summary: Get related products
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Related products
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Product"
+
+  /suppliers:
+    get:
+      operationId: listSuppliers
+      tags: [suppliers]
+      summary: List suppliers
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: country
+          in: query
+          schema:
+            type: string
+        - name: categoryId
+          in: query
+          schema:
+            type: integer
+        - name: verified
+          in: query
+          schema:
+            type: boolean
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Suppliers list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuppliersPage"
+
+  /suppliers/{id}:
+    get:
+      operationId: getSupplier
+      tags: [suppliers]
+      summary: Get supplier profile
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Supplier profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SupplierProfile"
+
+  /suppliers/featured:
+    get:
+      operationId: listFeaturedSuppliers
+      tags: [suppliers]
+      summary: Get featured/trusted suppliers
+      responses:
+        "200":
+          description: Featured suppliers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Supplier"
+
+  /suppliers/{id}/brands:
+    get:
+      operationId: listSupplierBrands
+      tags: [suppliers]
+      summary: List brands for a supplier
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Brands list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SupplierBrand"
+
+  /suppliers/{id}/documents:
+    get:
+      operationId: listSupplierDocuments
+      tags: [suppliers]
+      summary: List documents for a supplier
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Documents list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SupplierDocument"
+
+  /suppliers/{id}/experts:
+    get:
+      operationId: listSupplierExperts
+      tags: [suppliers]
+      summary: List experts for a supplier
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Experts list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SupplierExpert"
+
+  /projects:
+    get:
+      operationId: listProjects
+      tags: [projects]
+      summary: List projects and case studies
+      parameters:
+        - name: featured
+          in: query
+          schema:
+            type: boolean
+        - name: industry
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Projects list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Project"
+
+  /projects/{id}:
+    get:
+      operationId: getProject
+      tags: [projects]
+      summary: Get a project/case study by id
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Project detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+
+  /rfqs:
+    get:
+      operationId: listRfqs
+      tags: [rfqs]
+      summary: List RFQs (buyer sees own, supplier sees received)
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, active, closed, awarded]
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: RFQs list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RfqsPage"
+    post:
+      operationId: createRfq
+      tags: [rfqs]
+      summary: Create an RFQ
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRfqBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Rfq"
+
+  /rfqs/{id}:
+    get:
+      operationId: getRfq
+      tags: [rfqs]
+      summary: Get RFQ detail
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: RFQ detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RfqDetail"
+    put:
+      operationId: updateRfq
+      tags: [rfqs]
+      summary: Update an RFQ (buyer only, must be owner)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateRfqBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Rfq"
+    delete:
+      operationId: deleteRfq
+      tags: [rfqs]
+      summary: Delete an RFQ (buyer only, must be owner)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /rfqs/{id}/quotations:
+    get:
+      operationId: listRfqQuotations
+      tags: [quotations]
+      summary: List quotations for an RFQ
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Quotations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Quotation"
+    post:
+      operationId: submitQuotation
+      tags: [quotations]
+      summary: Submit a quotation for an RFQ
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateQuotationBody"
+      responses:
+        "201":
+          description: Submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Quotation"
+
+  /rfqs/{id}/quotations/{qid}/accept:
+    post:
+      operationId: acceptQuotation
+      tags: [quotations]
+      summary: Accept a quotation (buyer only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: qid
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "201":
+          description: Order created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+
+  /rfqs/{id}/quotations/{qid}/reject:
+    post:
+      operationId: rejectQuotation
+      tags: [quotations]
+      summary: Reject a quotation (buyer only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: qid
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Rejected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /rfqs/{id}/quotations/{qid}/negotiations:
+    get:
+      operationId: listNegotiationMessages
+      tags: [quotations]
+      summary: List negotiation messages for a quotation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: qid
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Negotiation messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/NegotiationMessage"
+    post:
+      operationId: sendNegotiationMessage
+      tags: [quotations]
+      summary: Send a negotiation message or counter-offer
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: qid
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateNegotiationMessageBody"
+      responses:
+        "201":
+          description: Sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NegotiationMessage"
+
+  /collective-orders:
+    get:
+      operationId: listCollectiveOrders
+      tags: [collective-orders]
+      summary: List active collective orders
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [open, closing_soon, closed, fulfilled]
+        - name: categoryId
+          in: query
+          schema:
+            type: integer
+        - name: region
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Collective orders
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CollectiveOrdersPage"
+    post:
+      operationId: createCollectiveOrder
+      tags: [collective-orders]
+      summary: Create a collective order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCollectiveOrderBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CollectiveOrder"
+
+  /collective-orders/{id}:
+    get:
+      operationId: getCollectiveOrder
+      tags: [collective-orders]
+      summary: Get collective order detail
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Collective order detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CollectiveOrderDetail"
+
+  /collective-orders/{id}/join:
+    post:
+      operationId: joinCollectiveOrder
+      tags: [collective-orders]
+      summary: Join a collective order
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JoinCollectiveOrderBody"
+      responses:
+        "200":
+          description: Joined
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CollectiveOrderParticipant"
+
+  /collective-orders/{id}/leave:
+    post:
+      operationId: leaveCollectiveOrder
+      tags: [collective-orders]
+      summary: Leave/withdraw from a collective order
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Left
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /orders:
+    get:
+      operationId: listOrders
+      tags: [orders]
+      summary: List orders
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, confirmed, processing, shipped, delivered, cancelled]
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Orders list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrdersPage"
+
+  /orders/{id}:
+    get:
+      operationId: getOrder
+      tags: [orders]
+      summary: Get order detail
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Order detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+
+  /orders/{id}/status:
+    patch:
+      operationId: updateOrderStatus
+      tags: [orders]
+      summary: Update order status (supplier progresses, buyer confirms delivery)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateOrderStatusBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+
+  /messages:
+    get:
+      operationId: listConversations
+      tags: [messages]
+      summary: List conversations
+      responses:
+        "200":
+          description: Conversations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Conversation"
+
+  /messages/{conversationId}:
+    get:
+      operationId: getMessages
+      tags: [messages]
+      summary: Get messages in a conversation
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Message"
+    post:
+      operationId: sendMessage
+      tags: [messages]
+      summary: Send a message
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendMessageBody"
+      responses:
+        "201":
+          description: Sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+
+  /notifications:
+    get:
+      operationId: listNotifications
+      tags: [notifications]
+      summary: List notifications
+      parameters:
+        - name: unreadOnly
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Notifications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Notification"
+
+  /notifications/read-all:
+    post:
+      operationId: markAllNotificationsRead
+      tags: [notifications]
+      summary: Mark all notifications as read
+      responses:
+        "200":
+          description: Marked read
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /dashboard/buyer-stats:
+    get:
+      operationId: getBuyerStats
+      tags: [dashboard]
+      summary: Get buyer dashboard statistics
+      responses:
+        "200":
+          description: Buyer stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BuyerStats"
+
+  /dashboard/supplier-stats:
+    get:
+      operationId: getSupplierStats
+      tags: [dashboard]
+      summary: Get supplier dashboard statistics
+      responses:
+        "200":
+          description: Supplier stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SupplierStats"
+
+  /dashboard/marketplace-stats:
+    get:
+      operationId: getMarketplaceStats
+      tags: [dashboard]
+      summary: Get public marketplace statistics (homepage)
+      responses:
+        "200":
+          description: Marketplace stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MarketplaceStats"
+
+  /products/{id}/reviews:
+    get:
+      operationId: listProductReviews
+      tags: [reviews]
+      summary: List reviews for a product
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Reviews
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Review"
+    post:
+      operationId: createProductReview
+      tags: [reviews]
+      summary: Create a review
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateReviewBody"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Review"
+
+  /admin/users:
+    get:
+      operationId: adminListUsers
+      tags: [admin]
+      summary: List all users (admin)
+      parameters:
+        - name: role
+          in: query
+          schema:
+            type: string
+            enum: [buyer, supplier, admin]
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, suspended, pending_verification]
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Users list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UsersPage"
+
+  /admin/users/{id}/status:
+    put:
+      operationId: adminUpdateUserStatus
+      tags: [admin]
+      summary: Update user status (ban/activate)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserStatusBody"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /admin/suppliers/{id}/verify:
+    put:
+      operationId: adminVerifySupplier
+      tags: [admin]
+      summary: Verify/approve a supplier
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Verified
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /admin/stats:
+    get:
+      operationId: getAdminStats
+      tags: [admin]
+      summary: Get platform-wide admin statistics
+      responses:
+        "200":
+          description: Admin stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminStats"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required: [status]
+
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+      required: [message]
+
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        user:
+          $ref: "#/components/schemas/User"
+      required: [token, user]
+
+    RegisterBody:
+      type: object
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+        role:
+          type: string
+          enum: [buyer, supplier]
+        firstName:
+          type: string
+        lastName:
+          type: string
+        companyName:
+          type: string
+        industry:
+          type: string
+        country:
+          type: string
+        phone:
+          type: string
+        commercialRegNumber:
+          type: string
+        warehouseLocation:
+          type: string
+      required: [email, password, role, firstName, lastName, companyName, country]
+
+    LoginBody:
+      type: object
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+      required: [email, password]
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+        role:
+          type: string
+          enum: [buyer, supplier, admin]
+        firstName:
+          type: string
+        lastName:
+          type: string
+        companyName:
+          type: string
+        country:
+          type: string
+        phone:
+          type: string
+        avatarUrl:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [active, suspended, pending_verification]
+        createdAt:
+          type: string
+      required: [id, email, role, firstName, lastName, companyName, country, status, createdAt]
+
+    Category:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        nameAr:
+          type: string
+        slug:
+          type: string
+        iconUrl:
+          type: string
+          nullable: true
+        productCount:
+          type: integer
+      required: [id, name, nameAr, slug, productCount]
+
+    PricingTier:
+      type: object
+      properties:
+        minQuantity:
+          type: number
+        maxQuantity:
+          type: number
+          nullable: true
+        pricePerUnit:
+          type: number
+        discountPercent:
+          type: number
+      required: [minQuantity, pricePerUnit, discountPercent]
+
+    TechnicalSpec:
+      type: object
+      properties:
+        name:
+          type: string
+        value:
+          type: string
+        unit:
+          type: string
+          nullable: true
+      required: [name, value]
+
+    Product:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        casNumber:
+          type: string
+          nullable: true
+        description:
+          type: string
+        categoryId:
+          type: integer
+        categoryName:
+          type: string
+        supplierId:
+          type: integer
+        supplierName:
+          type: string
+        supplierVerified:
+          type: boolean
+        supplierCountry:
+          type: string
+        imageUrl:
+          type: string
+          nullable: true
+        moq:
+          type: number
+        moqUnit:
+          type: string
+        basePrice:
+          type: number
+          nullable: true
+        currency:
+          type: string
+        availability:
+          type: string
+          enum: [in_stock, limited, out_of_stock]
+        deliveryLeadTime:
+          type: string
+        collectiveEligible:
+          type: boolean
+        rating:
+          type: number
+          nullable: true
+        reviewCount:
+          type: integer
+        createdAt:
+          type: string
+      required: [id, name, description, categoryId, categoryName, supplierId, supplierName, supplierVerified, supplierCountry, moq, moqUnit, currency, availability, deliveryLeadTime, collectiveEligible, reviewCount, createdAt]
+
+    ProductDetail:
+      allOf:
+        - $ref: "#/components/schemas/Product"
+        - type: object
+          properties:
+            images:
+              type: array
+              items:
+                type: string
+            technicalSpecs:
+              type: array
+              items:
+                $ref: "#/components/schemas/TechnicalSpec"
+            pricingTiers:
+              type: array
+              items:
+                $ref: "#/components/schemas/PricingTier"
+            applications:
+              type: array
+              items:
+                type: string
+            packaging:
+              type: string
+              nullable: true
+            countryOfOrigin:
+              type: string
+            sdsDocumentUrl:
+              type: string
+              nullable: true
+            supplier:
+              $ref: "#/components/schemas/Supplier"
+          required: [images, technicalSpecs, pricingTiers, applications, countryOfOrigin]
+
+    ProductsPage:
+      type: object
+      properties:
+        products:
+          type: array
+          items:
+            $ref: "#/components/schemas/Product"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+        totalPages:
+          type: integer
+      required: [products, total, page, limit, totalPages]
+
+    CreateProductBody:
+      type: object
+      properties:
+        name:
+          type: string
+        casNumber:
+          type: string
+        description:
+          type: string
+        categoryId:
+          type: integer
+        imageUrl:
+          type: string
+        images:
+          type: array
+          items:
+            type: string
+        moq:
+          type: number
+        moqUnit:
+          type: string
+        basePrice:
+          type: number
+        currency:
+          type: string
+        availability:
+          type: string
+          enum: [in_stock, limited, out_of_stock]
+        deliveryLeadTime:
+          type: string
+        collectiveEligible:
+          type: boolean
+        countryOfOrigin:
+          type: string
+        technicalSpecs:
+          type: array
+          items:
+            $ref: "#/components/schemas/TechnicalSpec"
+        pricingTiers:
+          type: array
+          items:
+            $ref: "#/components/schemas/PricingTier"
+        applications:
+          type: array
+          items:
+            type: string
+        packaging:
+          type: string
+      required: [name, description, categoryId, moq, moqUnit, currency, availability, deliveryLeadTime, collectiveEligible, countryOfOrigin]
+
+    UpdateProductBody:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        moq:
+          type: number
+        basePrice:
+          type: number
+        availability:
+          type: string
+          enum: [in_stock, limited, out_of_stock]
+        deliveryLeadTime:
+          type: string
+        collectiveEligible:
+          type: boolean
+
+    TrendingData:
+      type: object
+      properties:
+        trendingSearches:
+          type: array
+          items:
+            type: string
+        popularCategories:
+          type: array
+          items:
+            $ref: "#/components/schemas/Category"
+        recommendedProducts:
+          type: array
+          items:
+            $ref: "#/components/schemas/Product"
+      required: [trendingSearches, popularCategories, recommendedProducts]
+
+    Supplier:
+      type: object
+      properties:
+        id:
+          type: integer
+        companyName:
+          type: string
+        logoUrl:
+          type: string
+          nullable: true
+        country:
+          type: string
+        verified:
+          type: boolean
+        certifications:
+          type: array
+          items:
+            type: string
+        productCount:
+          type: integer
+        responseRate:
+          type: number
+        avgResponseTime:
+          type: string
+        yearsInBusiness:
+          type: integer
+          nullable: true
+        rating:
+          type: number
+          nullable: true
+      required: [id, companyName, country, verified, certifications, productCount, responseRate, avgResponseTime]
+
+    SupplierProfile:
+      allOf:
+        - $ref: "#/components/schemas/Supplier"
+        - type: object
+          properties:
+            description:
+              type: string
+              nullable: true
+            warehouseLocation:
+              type: string
+              nullable: true
+            products:
+              type: array
+              items:
+                $ref: "#/components/schemas/Product"
+          required: [products]
+
+    SuppliersPage:
+      type: object
+      properties:
+        suppliers:
+          type: array
+          items:
+            $ref: "#/components/schemas/Supplier"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+        totalPages:
+          type: integer
+      required: [suppliers, total, page, limit, totalPages]
+
+    Rfq:
+      type: object
+      properties:
+        id:
+          type: integer
+        buyerId:
+          type: integer
+        buyerCompanyName:
+          type: string
+        productName:
+          type: string
+        casNumber:
+          type: string
+          nullable: true
+        quantity:
+          type: number
+        unit:
+          type: string
+        deliveryDestination:
+          type: string
+        deliveryDeadline:
+          type: string
+        status:
+          type: string
+          enum: [pending, active, closed, awarded]
+        quotationCount:
+          type: integer
+        createdAt:
+          type: string
+      required: [id, buyerId, buyerCompanyName, productName, quantity, unit, deliveryDestination, deliveryDeadline, status, quotationCount, createdAt]
+
+    RfqDetail:
+      allOf:
+        - $ref: "#/components/schemas/Rfq"
+        - type: object
+          properties:
+            description:
+              type: string
+              nullable: true
+            specifications:
+              type: string
+              nullable: true
+            quotations:
+              type: array
+              items:
+                $ref: "#/components/schemas/Quotation"
+          required: [quotations]
+
+    RfqsPage:
+      type: object
+      properties:
+        rfqs:
+          type: array
+          items:
+            $ref: "#/components/schemas/Rfq"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+        totalPages:
+          type: integer
+      required: [rfqs, total, page, limit, totalPages]
+
+    CreateRfqBody:
+      type: object
+      properties:
+        productName:
+          type: string
+        casNumber:
+          type: string
+        quantity:
+          type: number
+        unit:
+          type: string
+        deliveryDestination:
+          type: string
+        deliveryDeadline:
+          type: string
+        description:
+          type: string
+        specifications:
+          type: string
+        categoryId:
+          type: integer
+      required: [productName, quantity, unit, deliveryDestination, deliveryDeadline]
+
+    UpdateRfqBody:
+      type: object
+      properties:
+        productName:
+          type: string
+        casNumber:
+          type: string
+        quantity:
+          type: number
+        unit:
+          type: string
+        deliveryDestination:
+          type: string
+        deliveryDeadline:
+          type: string
+        description:
+          type: string
+        specifications:
+          type: string
+        categoryId:
+          type: integer
+
+    Quotation:
+      type: object
+      properties:
+        id:
+          type: integer
+        rfqId:
+          type: integer
+        supplierId:
+          type: integer
+        supplierName:
+          type: string
+        supplierVerified:
+          type: boolean
+        pricePerUnit:
+          type: number
+        currency:
+          type: string
+        totalPrice:
+          type: number
+        deliveryTime:
+          type: string
+        validUntil:
+          type: string
+        notes:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [pending, accepted, rejected, expired]
+        createdAt:
+          type: string
+      required: [id, rfqId, supplierId, supplierName, supplierVerified, pricePerUnit, currency, totalPrice, deliveryTime, validUntil, status, createdAt]
+
+    CreateQuotationBody:
+      type: object
+      properties:
+        pricePerUnit:
+          type: number
+        currency:
+          type: string
+        deliveryTime:
+          type: string
+        validUntil:
+          type: string
+        notes:
+          type: string
+      required: [pricePerUnit, currency, deliveryTime, validUntil]
+
+    NegotiationMessage:
+      type: object
+      properties:
+        id:
+          type: integer
+        quotationId:
+          type: integer
+        senderId:
+          type: integer
+        senderName:
+          type: string
+        senderRole:
+          type: string
+        type:
+          type: string
+          enum: [message, counter_offer]
+        content:
+          type: string
+        proposedPrice:
+          type: number
+          nullable: true
+        proposedDeliveryTime:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+      required: [id, quotationId, senderId, senderName, senderRole, type, content, createdAt]
+
+    CreateNegotiationMessageBody:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [message, counter_offer]
+        content:
+          type: string
+        proposedPrice:
+          type: number
+        proposedDeliveryTime:
+          type: string
+      required: [type, content]
+
+    UpdateOrderStatusBody:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [confirmed, processing, shipped, delivered, cancelled]
+        trackingNumber:
+          type: string
+        estimatedDelivery:
+          type: string
+      required: [status]
+
+    CollectiveOrder:
+      type: object
+      properties:
+        id:
+          type: integer
+        productId:
+          type: integer
+        productName:
+          type: string
+        productImageUrl:
+          type: string
+          nullable: true
+        supplierId:
+          type: integer
+        supplierName:
+          type: string
+        targetQuantity:
+          type: number
+        currentQuantity:
+          type: number
+        unit:
+          type: string
+        participantCount:
+          type: integer
+        basePrice:
+          type: number
+        currentPrice:
+          type: number
+        estimatedDiscount:
+          type: number
+        currentTier:
+          type: string
+        nextTierQuantity:
+          type: number
+          nullable: true
+        nextTierDiscount:
+          type: number
+          nullable: true
+        status:
+          type: string
+          enum: [open, closing_soon, closed, fulfilled]
+        deadline:
+          type: string
+        deliveryRegion:
+          type: string
+        moqPerParticipant:
+          type: number
+        estimatedSavingsPerTon:
+          type: number
+        createdAt:
+          type: string
+      required: [id, productId, productName, supplierId, supplierName, targetQuantity, currentQuantity, unit, participantCount, basePrice, currentPrice, estimatedDiscount, currentTier, status, deadline, deliveryRegion, moqPerParticipant, estimatedSavingsPerTon, createdAt]
+
+    CollectiveOrderDetail:
+      allOf:
+        - $ref: "#/components/schemas/CollectiveOrder"
+        - type: object
+          properties:
+            product:
+              $ref: "#/components/schemas/Product"
+            pricingTiers:
+              type: array
+              items:
+                $ref: "#/components/schemas/PricingTier"
+            participants:
+              type: array
+              items:
+                $ref: "#/components/schemas/CollectiveOrderParticipant"
+            packagingOptions:
+              type: array
+              items:
+                type: string
+            logisticsSavingsEstimate:
+              type: number
+          required: [product, pricingTiers, participants, packagingOptions, logisticsSavingsEstimate]
+
+    CollectiveOrdersPage:
+      type: object
+      properties:
+        collectiveOrders:
+          type: array
+          items:
+            $ref: "#/components/schemas/CollectiveOrder"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+        totalPages:
+          type: integer
+      required: [collectiveOrders, total, page, limit, totalPages]
+
+    CreateCollectiveOrderBody:
+      type: object
+      properties:
+        productName:
+          type: string
+        targetQuantity:
+          type: number
+        unit:
+          type: string
+        deadline:
+          type: string
+        deliveryRegion:
+          type: string
+        moqPerParticipant:
+          type: number
+        pricingTiers:
+          type: array
+          items:
+            $ref: "#/components/schemas/PricingTier"
+      required: [productName, targetQuantity, unit, deadline, deliveryRegion, moqPerParticipant, pricingTiers]
+
+    CollectiveOrderParticipant:
+      type: object
+      properties:
+        id:
+          type: integer
+        collectiveOrderId:
+          type: integer
+        buyerId:
+          type: integer
+        companyName:
+          type: string
+        quantity:
+          type: number
+        deliveryDestination:
+          type: string
+        joinedAt:
+          type: string
+      required: [id, collectiveOrderId, buyerId, companyName, quantity, deliveryDestination, joinedAt]
+
+    JoinCollectiveOrderBody:
+      type: object
+      properties:
+        quantity:
+          type: number
+        deliveryDestination:
+          type: string
+        paymentTerms:
+          type: string
+      required: [quantity, deliveryDestination]
+
+    Order:
+      type: object
+      properties:
+        id:
+          type: integer
+        buyerId:
+          type: integer
+        supplierId:
+          type: integer
+        supplierName:
+          type: string
+        productName:
+          type: string
+        quantity:
+          type: number
+        unit:
+          type: string
+        totalPrice:
+          type: number
+        currency:
+          type: string
+        status:
+          type: string
+          enum: [pending, confirmed, processing, shipped, delivered, cancelled]
+        trackingNumber:
+          type: string
+          nullable: true
+        estimatedDelivery:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+      required: [id, buyerId, supplierId, supplierName, productName, quantity, unit, totalPrice, currency, status, createdAt]
+
+    OrdersPage:
+      type: object
+      properties:
+        orders:
+          type: array
+          items:
+            $ref: "#/components/schemas/Order"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+        totalPages:
+          type: integer
+      required: [orders, total, page, limit, totalPages]
+
+    Conversation:
+      type: object
+      properties:
+        id:
+          type: integer
+        otherPartyId:
+          type: integer
+        otherPartyName:
+          type: string
+        otherPartyLogoUrl:
+          type: string
+          nullable: true
+        lastMessage:
+          type: string
+          nullable: true
+        lastMessageAt:
+          type: string
+          nullable: true
+        unreadCount:
+          type: integer
+      required: [id, otherPartyId, otherPartyName, unreadCount]
+
+    Message:
+      type: object
+      properties:
+        id:
+          type: integer
+        conversationId:
+          type: integer
+        senderId:
+          type: integer
+        senderName:
+          type: string
+        content:
+          type: string
+        createdAt:
+          type: string
+        isRead:
+          type: boolean
+      required: [id, conversationId, senderId, senderName, content, createdAt, isRead]
+
+    SendMessageBody:
+      type: object
+      properties:
+        content:
+          type: string
+      required: [content]
+
+    Notification:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        type:
+          type: string
+          enum: [rfq_update, new_quotation, order_update, collective_milestone, payment_reminder, system]
+        title:
+          type: string
+        message:
+          type: string
+        isRead:
+          type: boolean
+        relatedId:
+          type: integer
+          nullable: true
+        relatedType:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+      required: [id, userId, type, title, message, isRead, createdAt]
+
+    BuyerStats:
+      type: object
+      properties:
+        totalRfqs:
+          type: integer
+        activeRfqs:
+          type: integer
+        totalOrders:
+          type: integer
+        pendingOrders:
+          type: integer
+        collectiveOrdersJoined:
+          type: integer
+        totalSavings:
+          type: number
+        unreadMessages:
+          type: integer
+        savedSuppliers:
+          type: integer
+        recentActivity:
+          type: array
+          items:
+            $ref: "#/components/schemas/ActivityItem"
+        monthlySpend:
+          type: array
+          items:
+            $ref: "#/components/schemas/MonthlyDataPoint"
+      required: [totalRfqs, activeRfqs, totalOrders, pendingOrders, collectiveOrdersJoined, totalSavings, unreadMessages, savedSuppliers, recentActivity, monthlySpend]
+
+    SupplierStats:
+      type: object
+      properties:
+        totalProducts:
+          type: integer
+        activeRfqs:
+          type: integer
+        totalOrders:
+          type: integer
+        pendingOrders:
+          type: integer
+        totalRevenue:
+          type: number
+        monthlyRevenue:
+          type: number
+        responseRate:
+          type: number
+        avgResponseTime:
+          type: string
+        unreadMessages:
+          type: integer
+        recentActivity:
+          type: array
+          items:
+            $ref: "#/components/schemas/ActivityItem"
+        revenueByMonth:
+          type: array
+          items:
+            $ref: "#/components/schemas/MonthlyDataPoint"
+        topProducts:
+          type: array
+          items:
+            $ref: "#/components/schemas/Product"
+      required: [totalProducts, activeRfqs, totalOrders, pendingOrders, totalRevenue, monthlyRevenue, responseRate, avgResponseTime, unreadMessages, recentActivity, revenueByMonth, topProducts]
+
+    MarketplaceStats:
+      type: object
+      properties:
+        totalProducts:
+          type: integer
+        totalSuppliers:
+          type: integer
+        totalBuyers:
+          type: integer
+        totalTransactions:
+          type: integer
+        countriesServed:
+          type: integer
+        activeCollectiveOrders:
+          type: integer
+      required: [totalProducts, totalSuppliers, totalBuyers, totalTransactions, countriesServed, activeCollectiveOrders]
+
+    AdminStats:
+      type: object
+      properties:
+        totalUsers:
+          type: integer
+        totalSuppliers:
+          type: integer
+        pendingVerifications:
+          type: integer
+        totalProducts:
+          type: integer
+        totalRfqs:
+          type: integer
+        totalOrders:
+          type: integer
+        totalRevenue:
+          type: number
+        activeCollectiveOrders:
+          type: integer
+        usersByMonth:
+          type: array
+          items:
+            $ref: "#/components/schemas/MonthlyDataPoint"
+        revenueByMonth:
+          type: array
+          items:
+            $ref: "#/components/schemas/MonthlyDataPoint"
+      required: [totalUsers, totalSuppliers, pendingVerifications, totalProducts, totalRfqs, totalOrders, totalRevenue, activeCollectiveOrders, usersByMonth, revenueByMonth]
+
+    ActivityItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+        description:
+          type: string
+        createdAt:
+          type: string
+      required: [id, type, description, createdAt]
+
+    MonthlyDataPoint:
+      type: object
+      properties:
+        month:
+          type: string
+        value:
+          type: number
+      required: [month, value]
+
+    Review:
+      type: object
+      properties:
+        id:
+          type: integer
+        productId:
+          type: integer
+        buyerId:
+          type: integer
+        buyerCompanyName:
+          type: string
+        rating:
+          type: integer
+        comment:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+      required: [id, productId, buyerId, buyerCompanyName, rating, createdAt]
+
+    CreateReviewBody:
+      type: object
+      properties:
+        rating:
+          type: integer
+        comment:
+          type: string
+      required: [rating]
+
+    UsersPage:
+      type: object
+      properties:
+        users:
+          type: array
+          items:
+            $ref: "#/components/schemas/User"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+        totalPages:
+          type: integer
+      required: [users, total, page, limit, totalPages]
+
+    UpdateUserStatusBody:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [active, suspended, pending_verification]
+      required: [status]
+
+    SupplierBrand:
+      type: object
+      properties:
+        id:
+          type: integer
+        supplierId:
+          type: integer
+        name:
+          type: string
+        logoUrl:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+      required: [id, supplierId, name, createdAt]
+
+    SupplierDocument:
+      type: object
+      properties:
+        id:
+          type: integer
+        supplierId:
+          type: integer
+        title:
+          type: string
+        type:
+          type: string
+        fileUrl:
+          type: string
+        fileSize:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+      required: [id, supplierId, title, type, fileUrl, createdAt]
+
+    SupplierExpert:
+      type: object
+      properties:
+        id:
+          type: integer
+        supplierId:
+          type: integer
+        name:
+          type: string
+        title:
+          type: string
+        email:
+          type: string
+        avatarUrl:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+      required: [id, supplierId, name, title, email, createdAt]
+
+    Project:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        slug:
+          type: string
+        summary:
+          type: string
+        description:
+          type: string
+        heroImageUrl:
+          type: string
+          nullable: true
+        industryTags:
+          type: array
+          items:
+            type: string
+        chemicalsUsed:
+          type: array
+          items:
+            type: string
+        supplierId:
+          type: integer
+          nullable: true
+        featured:
+          type: boolean
+        createdAt:
+          type: string
+      required: [id, title, slug, summary, description, industryTags, chemicalsUsed, featured, createdAt]

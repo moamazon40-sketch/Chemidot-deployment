@@ -1,0 +1,64 @@
+Build a responsive React application using Tailwind CSS, Lucide-React for icons, and shadcn/ui for components. Focus on a high-density, symmetric data management interface for an industrial marketplace."
+
+1. Layout & Sidebar Architecture:
+
+Sidebar: Create a fixed-width sidebar with a navigation menu containing: Dashboard, Settings, Products (Active), Privacy Policy, and Logout.
+
+Header: In the main content area, include a 'Back' button and an 'Add Product' heading.
+
+Navigation Tabs: Implement a Tab system to switch between 'Manual Entry' and 'Bulk Import'.
+
+2. Manual Entry Tab (Symmetric 3-Column Grid):
+Organize the 'Basic Information' section into a 3-column grid. Use the following options for each row:
+
+Row 1 (Text & Numeric):
+
+Name: Standard text input.
+
+Description: Multi-line text area.
+
+Minimum Purity: Numeric input (0-100%).
+
+Row 2 (Logistics & Visuals):
+
+Minimum Quantity: Numeric input.
+
+Maximum Quantity: Numeric input.
+
+Appearance: Dropdown options: Liquid, Powder, Crystals, Granular, Gas, Pellets.
+
+Row 3 (Classification):
+
+Categories: Dropdown options: Industrial Chemicals, Construction Chemicals, Solvents, Polymers, Fine Chemicals, Additives.
+
+Deliver Countries: Multi-select dropdown featuring global country list (prioritize GCC countries like Saudi Arabia, UAE, Qatar).
+
+Incoterms: Dropdown options: EXW, FCA, CPT, CIP, DAP, DPU, DDP, FAS, FOB, CFR, CIF.
+
+Row 4 (Industry & Packaging):
+
+Industries: Multi-select options: Construction, Pharmaceuticals, Agriculture, Manufacturing, Oil & Gas, Water Treatment.
+
+Packaging: Dropdown options: Drums, IBC Totes, Bags (25kg), Bulk Tanker, Carboys, Pallets.
+
+Units: Dropdown options: kg, Metric Tons, Liters, Gallons, mg.
+
+Row 5 (Storage & Identification):
+
+Substances: Searchable input for CAS numbers or chemical formulas.
+
+Warehouses: Dropdown to select from user-defined storage locations.
+
+3. Documentation Section:
+
+Create a vertical stack of three upload buttons: 'Safety Data Sheet', 'Technical Data Sheet', and 'Additional Document'.
+
+Constraint: Do not include a product image upload area.
+
+4. Bulk Import Tab:
+
+Interface: A dedicated drag-and-drop file upload zone for CSV/Excel.
+
+Support: A button to 'Download Template' containing all headers from the manual entry rows.
+
+Workflow: After upload, generate a preview table of the first 5 rows for data verification

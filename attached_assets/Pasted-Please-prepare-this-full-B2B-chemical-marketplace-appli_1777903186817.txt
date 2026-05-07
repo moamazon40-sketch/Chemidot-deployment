@@ -1,0 +1,107 @@
+Please prepare this full B2B chemical marketplace application for production deployment.
+
+This includes:
+
+Marketplace system
+RFQ system
+Collective Order system
+Supplier Excel upload system
+Authentication system
+Backend APIs + database
+🎯 OBJECTIVE
+
+Make the system:
+
+Stable
+Secure
+Scalable
+Ready for real users and real data
+🔧 WHAT YOU MUST DO
+1. ENVIRONMENT SETUP
+Move all sensitive values to .env
+Ensure proper configuration for:
+Database connection
+API keys (if any)
+Server port handling
+Ensure no hardcoded secrets exist
+2. BACKEND PRODUCTION HARDENING
+Add proper error handling for all APIs
+Prevent server crashes from invalid inputs
+Validate all incoming requests (RFQ, product upload, collective orders)
+Add rate limiting (basic protection against spam)
+Ensure all endpoints return consistent JSON responses
+3. DATABASE STABILITY
+Verify all tables are production-ready:
+Users
+Products
+RFQs
+Collective Orders
+Ensure indexes exist for:
+product_name
+cas_number
+category
+Ensure relationships are correct and no orphan data can occur
+4. FILE UPLOAD SECURITY (IMPORTANT)
+
+For Excel upload system:
+
+Restrict file types to .xlsx only
+Limit file size
+Sanitize all parsed data
+Reject corrupted or invalid files safely
+5. PERFORMANCE OPTIMIZATION
+Optimize product search queries
+Ensure marketplace loads fast even with large datasets
+Add pagination for:
+products
+RFQs
+collective orders
+Avoid heavy operations on request cycle
+6. AUTHENTICATION & SECURITY
+Ensure JWT or session system is secure
+Protect sensitive routes (supplier, admin)
+Prevent unauthorized RFQ or product manipulation
+Validate user roles properly:
+Buyer
+Supplier
+Admin
+7. LOGGING & MONITORING
+Add basic logging for:
+RFQ submissions
+Product uploads
+Collective order joins
+Log API errors for debugging
+8. FRONTEND PRODUCTION CHECK
+Ensure all API calls use production base URL
+Ensure no localhost dependencies remain
+Ensure UI works on:
+Mobile
+Desktop
+Fix any broken UI states or loading issues
+9. FINAL PRODUCTION CHECKLIST
+
+Before marking as ready, confirm:
+
+Marketplace works end-to-end
+RFQ creation → storage → retrieval works
+Supplier Excel upload works
+Collective orders fully functional
+No server crashes under invalid input
+All APIs respond correctly
+🚀 FINAL OUTPUT REQUIRED
+
+Provide:
+
+Production readiness status (YES/NO)
+List of critical issues fixed
+List of remaining risks (if any)
+Confirmation that system is safe for real users
+🎯 GOAL
+
+Prepare this system for real-world launch, not demo mode.
+
+It must be:
+
+Stable under real traffic
+Safe for real business data
+Ready for suppliers and buyers to actively use

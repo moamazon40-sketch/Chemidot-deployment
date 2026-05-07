@@ -1,0 +1,50 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "Y1nd0u5J6czVt9SIQjz61"
+uri = "file://artifacts/chemidot/public/images/hero-bg.png"
+type = "image"
+title = "abstract tech chemical background"
+
+[[generated]]
+id = "pljI51Z8PZ2aoumvn6Kl5"
+uri = "file://artifacts/chemidot/public/images/products/ethylene.png"
+type = "image"
+title = "ethylene gas cylinder product"
+
+[[generated]]
+id = "DW-werHBcTLreJclvuME8"
+uri = "file://artifacts/chemidot/public/images/products/sodium-hydroxide.png"
+type = "image"
+title = "sodium hydroxide flakes product"
+
+[[generated]]
+id = "bwnAn1rQtC5g52LClXj1J"
+uri = "file://artifacts/chemidot/public/images/products/sulfuric-acid.png"
+type = "image"
+title = "sulfuric acid liquid product"
+
+[[generated]]
+id = "7pOo5I7LPzojZcWLtzf1H"
+uri = "file://artifacts/chemidot/public/images/products/polyethylene.png"
+type = "image"
+title = "polyethylene resin pellets product"
+
+[[generated]]
+id = "kLgIgRs9sl37L7oRxwhgP"
+uri = "file://artifacts/chemidot/public/images/products/titanium-dioxide.png"
+type = "image"
+title = "titanium dioxide powder product"
+
+[[generated]]
+id = "S8kg63sk3_EOxdKifrxdn"
+uri = "file://artifacts/chemidot/public/images/suppliers/supplier-1.png"
+type = "image"
+title = "supplier logo SABIC"
+
+[[generated]]
+id = "Mr4KsLgNkocNNPl90S2bS"
+uri = "file://artifacts/chemidot/public/images/suppliers/supplier-2.png"
+type = "image"
+title = "supplier logo Aramco"
