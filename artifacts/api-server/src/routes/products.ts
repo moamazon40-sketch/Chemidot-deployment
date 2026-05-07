@@ -1,4 +1,5 @@
 import { Router } from "express";
+import multer from "multer";
 import { db } from "@workspace/db";
 import {
   productsTable, suppliersTable, categoriesTable, reviewsTable
@@ -9,6 +10,90 @@ import { asyncHandler } from "../middlewares/asyncHandler";
 import { CreateProductBody, UpdateProductBody } from "@workspace/api-zod";
 
 const router = Router();
+const parseProductRequest = multer().none();
+
+function parseOptionalStringArray(value: unknown): string[] | undefined {
+  if (value === undefined || value === null || value === "") return undefined;
+  if (Array.isArray(value)) return value.map(String);
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return undefined;
+    if (trimmed.startsWith("[")) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        return Array.isArray(parsed) ? parsed.map(String) : undefined;
+      } catch {
+        return undefined;
+      }
+    }
+    return [trimmed];
+  }
+  return undefined;
+}
+
+function parseOptionalJsonArray<T>(value: unknown): T[] | undefined {
+  if (value === undefined || value === null || value === "") return undefined;
+  if (Array.isArray(value)) return value as T[];
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return undefined;
+    try {
+      const parsed = JSON.parse(trimmed);
+      return Array.isArray(parsed) ? parsed as T[] : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+  return undefined;
+}
+
+function parseOptionalNumber(value: unknown): number | undefined {
+  if (value === undefined || value === null || value === "") return undefined;
+  if (typeof value === "number") return Number.isFinite(value) ? value : undefined;
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  return undefined;
+}
+
+function parseOptionalBoolean(value: unknown): boolean | undefined {
+  if (value === undefined || value === null || value === "") return undefined;
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    if (value === "true") return true;
+    if (value === "false") return false;
+  }
+  return undefined;
+}
+
+function normalizeCreateProductBody(body: Record<string, unknown>) {
+  return {
+    ...body,
+    categoryId: parseOptionalNumber(body.categoryId),
+    moq: parseOptionalNumber(body.moq),
+    basePrice: parseOptionalNumber(body.basePrice),
+    collectiveEligible: parseOptionalBoolean(body.collectiveEligible),
+    images: parseOptionalStringArray(body.images),
+    applications: parseOptionalStringArray(body.applications),
+    technicalSpecs: parseOptionalJsonArray(body.technicalSpecs),
+    pricingTiers: parseOptionalJsonArray(body.pricingTiers),
+  };
+}
+
+function getDbErrorMessage(error: unknown): string | null {
+  if (!error || typeof error !== "object") return null;
+  const code = "code" in error ? String((error as { code?: unknown }).code ?? "") : "";
+  const detail = "detail" in error ? String((error as { detail?: unknown }).detail ?? "") : "";
+  const message = "message" in error ? String((error as { message?: unknown }).message ?? "") : "";
+
+  if (code === "23503") return "The selected category or supplier does not exist.";
+  if (code === "23502") return "A required product field is missing.";
+  if (code === "22P02") return "One of the product fields has an invalid value.";
+  if (code === "23505") return "A product with the same unique value already exists.";
+
+  return detail || message || null;
+}
 
 function buildProductShape(p: any, s: any, c: any, reviewCount: number, rating: number | null) {
   return {
@@ -200,11 +285,17 @@ router.get("/products/:id/related", asyncHandler(async (req, res) => {
   res.json(rows.map(r => buildProductShape(r.products, r.suppliers, r.categories, 0, null)));
 }));
 
-router.post("/products", requireAuth, requireRole("supplier"), asyncHandler(async (req, res) => {
+router.post("/products", parseProductRequest, requireAuth, requireRole("supplier"), asyncHandler(async (req, res) => {
   const user = (req as any).user;
-  const parsed = CreateProductBody.safeParse(req.body);
+  const parsed = CreateProductBody.safeParse(normalizeCreateProductBody(req.body as Record<string, unknown>));
   if (!parsed.success) {
-    res.status(400).json({ message: "Invalid request body" });
+    res.status(400).json({
+      message: "Invalid request body",
+      issues: parsed.error.issues.map((issue) => ({
+        path: issue.path.join("."),
+        message: issue.message,
+      })),
+    });
     return;
   }
   const [supplier] = await db.select().from(suppliersTable).where(eq(suppliersTable.userId, user.id)).limit(1);
@@ -213,27 +304,52 @@ router.post("/products", requireAuth, requireRole("supplier"), asyncHandler(asyn
     return;
   }
   const body = parsed.data;
-  const [product] = await db.insert(productsTable).values({
-    supplierId: supplier.id,
-    categoryId: body.categoryId,
-    name: body.name,
-    casNumber: body.casNumber,
-    description: body.description,
-    imageUrl: body.imageUrl,
-    images: body.images ?? [],
-    moq: String(body.moq),
-    moqUnit: body.moqUnit,
-    basePrice: body.basePrice ? String(body.basePrice) : null,
-    currency: body.currency ?? "USD",
-    availability: body.availability,
-    deliveryLeadTime: body.deliveryLeadTime,
-    collectiveEligible: body.collectiveEligible ?? false,
-    countryOfOrigin: body.countryOfOrigin,
-    packaging: body.packaging,
-    technicalSpecs: body.technicalSpecs ?? [],
-    pricingTiers: body.pricingTiers ?? [],
-    applications: body.applications ?? [],
-  }).returning();
+  const [category] = await db.select().from(categoriesTable).where(eq(categoriesTable.id, body.categoryId)).limit(1);
+  if (!category) {
+    res.status(400).json({ message: "Selected category does not exist" });
+    return;
+  }
+
+  let product;
+  try {
+    [product] = await db.insert(productsTable).values({
+      supplierId: supplier.id,
+      categoryId: body.categoryId,
+      name: body.name.trim(),
+      casNumber: body.casNumber?.trim() || null,
+      description: body.description.trim(),
+      imageUrl: body.imageUrl?.trim() || null,
+      images: body.images ?? [],
+      moq: String(body.moq),
+      moqUnit: body.moqUnit.trim(),
+      basePrice: body.basePrice !== undefined ? String(body.basePrice) : null,
+      currency: body.currency.trim() || "USD",
+      availability: body.availability,
+      deliveryLeadTime: body.deliveryLeadTime.trim(),
+      collectiveEligible: body.collectiveEligible ?? false,
+      countryOfOrigin: body.countryOfOrigin.trim(),
+      packaging: body.packaging?.trim() || null,
+      technicalSpecs: body.technicalSpecs ?? [],
+      pricingTiers: body.pricingTiers ?? [],
+      applications: body.applications ?? [],
+    }).returning();
+  } catch (error) {
+    req.log.error({
+      err: error,
+      userId: user.id,
+      supplierId: supplier.id,
+      categoryId: body.categoryId,
+      route: "POST /api/products",
+    }, "Product creation failed");
+
+    const message = getDbErrorMessage(error);
+    if (message) {
+      res.status(400).json({ message });
+      return;
+    }
+
+    throw error;
+  }
 
   const [row] = await db.select().from(productsTable)
     .leftJoin(suppliersTable, eq(suppliersTable.id, productsTable.supplierId))

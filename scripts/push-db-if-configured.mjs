@@ -14,4 +14,17 @@ const result = spawnSync(
   },
 );
 
-process.exit(result.status ?? 1);
+if ((result.status ?? 1) !== 0) {
+  process.exit(result.status ?? 1);
+}
+
+const seedResult = spawnSync(
+  "pnpm",
+  ["--filter", "@workspace/scripts", "run", "ensure-base-data"],
+  {
+    stdio: "inherit",
+    shell: process.platform === "win32",
+  },
+);
+
+process.exit(seedResult.status ?? 1);

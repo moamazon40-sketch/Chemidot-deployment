@@ -46,14 +46,16 @@ const COUNTRY_MULTI_OPTIONS = ["Saudi Arabia", "UAE", "Kuwait", "Qatar", "Bahrai
 
 interface ProductFormData {
   name: string; description: string; minimumPurity: string; minimumQuantity: string; maximumQuantity: string;
-  appearance: string; categories: string; colors: string; deliverCountries: string; incoterms: string;
+  appearance: string; categoryId: string; colors: string; deliverCountries: string; incoterms: string;
   industries: string; packaging: string; units: string; substances: string; warehouses: string;
+  deliveryLeadTime: string; countryOfOrigin: string; basePrice: string; availability: "in_stock" | "limited" | "out_of_stock";
 }
 
 const defaultForm: ProductFormData = {
   name: "", description: "", minimumPurity: "", minimumQuantity: "", maximumQuantity: "",
-  appearance: "", categories: "", colors: "", deliverCountries: "", incoterms: "",
+  appearance: "", categoryId: "", colors: "", deliverCountries: "", incoterms: "",
   industries: "", packaging: "", units: "", substances: "", warehouses: "",
+  deliveryLeadTime: "2-4 weeks", countryOfOrigin: "Saudi Arabia", basePrice: "", availability: "in_stock",
 };
 
 const PRODUCT_TEMPLATES = [
@@ -71,12 +73,15 @@ function ProductFormDialog({
   open: boolean; onClose: () => void; onSaved: () => void; initial?: any;
 }) {
   const createProduct = useCreateProduct();
+  const { data: categories = [] } = useListCategories();
   const { toast } = useToast();
   const [form, setForm] = useState<ProductFormData>(
     initial ? {
       name: initial.name ?? "", description: initial.description ?? "", minimumPurity: "",
-      minimumQuantity: "", maximumQuantity: "", appearance: "", categories: "", colors: "",
-      deliverCountries: "", incoterms: "", industries: "", packaging: "", units: "", substances: "", warehouses: "",
+      minimumQuantity: String(initial.moq ?? ""), maximumQuantity: "", appearance: "", categoryId: String(initial.categoryId ?? ""), colors: "",
+      deliverCountries: "", incoterms: "", industries: "", packaging: initial.packaging ?? "", units: initial.moqUnit ?? "", substances: "",
+      warehouses: "", deliveryLeadTime: initial.deliveryLeadTime ?? "2-4 weeks", countryOfOrigin: initial.countryOfOrigin ?? "Saudi Arabia",
+      basePrice: initial.basePrice ? String(initial.basePrice) : "", availability: initial.availability ?? "in_stock",
     } : defaultForm
   );
   const [selectedCountries, setSelectedCountries] = useState<string[]>(["Saudi Arabia"]);
@@ -135,16 +140,16 @@ function ProductFormDialog({
         name: form.name,
         description: form.description,
         casNumber: form.substances || undefined,
-        categoryId: 1,
+        categoryId: parseInt(form.categoryId, 10),
         moq: parseFloat(form.minimumQuantity || "1"),
         moqUnit: form.units || "kg",
-        basePrice: undefined,
+        basePrice: form.basePrice ? parseFloat(form.basePrice) : undefined,
         currency: "USD",
-        availability: "in_stock" as any,
-        deliveryLeadTime: "",
+        availability: form.availability,
+        deliveryLeadTime: form.deliveryLeadTime,
         collectiveEligible: false,
-        countryOfOrigin: "",
-        packaging: form.packaging || "",
+        countryOfOrigin: form.countryOfOrigin,
+        packaging: form.packaging || undefined,
         pricingTiers: [],
         images: [], applications: [], technicalSpecs: [],
       }
@@ -154,7 +159,11 @@ function ProductFormDialog({
         onSaved();
         onClose();
       },
-      onError: () => toast({ title: "Failed to save product", variant: "destructive" }),
+      onError: (error: any) => toast({
+        title: "Failed to save product",
+        description: error?.response?.data?.message ?? "Please check the required product fields.",
+        variant: "destructive",
+      }),
     });
   };
 
@@ -213,9 +222,9 @@ function ProductFormDialog({
                     </div>
                     <div className="space-y-1.5">
                       <Label>Category</Label>
-                      <select className="w-full h-10 rounded-md border bg-background px-3 text-sm" value={form.categories} onChange={f("categories")}>
+                      <select className="w-full h-10 rounded-md border bg-background px-3 text-sm" value={form.categoryId} onChange={f("categoryId")}>
                         <option value="">Select category</option>
-                        {CATEGORY_OPTIONS.map(v => <option key={v}>{v}</option>)}
+                        {categories.map((category) => <option key={category.id} value={String(category.id)}>{category.name}</option>)}
                       </select>
                     </div>
                   </div>
@@ -247,11 +256,25 @@ function ProductFormDialog({
 
                   {/* ── Row 5: Incoterms ── */}
                   <div className="grid gap-4 md:grid-cols-3">
+                    <div className="space-y-1.5"><Label>Base Price (USD)</Label><Input type="number" min="0" step="0.01" value={form.basePrice} onChange={f("basePrice")} /></div>
+                    <div className="space-y-1.5"><Label>Country of Origin</Label><Input value={form.countryOfOrigin} onChange={f("countryOfOrigin")} /></div>
+                    <div className="space-y-1.5"><Label>Delivery Lead Time</Label><Input value={form.deliveryLeadTime} onChange={f("deliveryLeadTime")} /></div>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-3">
                     <div className="space-y-1.5">
                       <Label>Incoterms</Label>
                       <select className="w-full h-10 rounded-md border bg-background px-3 text-sm" value={form.incoterms} onChange={f("incoterms")}>
                         <option value="">Select incoterm</option>
                         {INCOTERM_OPTIONS.map(v => <option key={v}>{v}</option>)}
+                      </select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Availability</Label>
+                      <select className="w-full h-10 rounded-md border bg-background px-3 text-sm" value={form.availability} onChange={f("availability")}>
+                        <option value="in_stock">In Stock</option>
+                        <option value="limited">Limited</option>
+                        <option value="out_of_stock">Out of Stock</option>
                       </select>
                     </div>
                   </div>

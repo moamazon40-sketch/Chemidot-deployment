@@ -96,7 +96,11 @@ if (frontendDist) {
 
 
 app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
-  req.log.error({ err }, "Unhandled error");
+  req.log.error({
+    err,
+    path: req.originalUrl,
+    method: req.method,
+  }, "Unhandled error");
   res.status(500).json({ message: "Internal server error" });
 });
 

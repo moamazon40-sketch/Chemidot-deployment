@@ -6,6 +6,7 @@
   "scripts": {
     "hello": "tsx ./src/hello.ts",
     "seed": "tsx ./src/seed.ts",
+    "ensure-base-data": "tsx ./src/ensure-base-data.ts",
     "seed:projects": "tsx ./src/seed-projects.ts",
     "seed:supplier-shop": "tsx ./src/seed-supplier-shop.ts",
     "update:supplier-shop-urls": "tsx ./src/update-supplier-shop-urls.ts",
