@@ -5,9 +5,9 @@ import { usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
 function getJwtSecret(): string {
-  const secret = process.env.SESSION_SECRET;
+  const secret = process.env.SESSION_SECRET ?? process.env.JWT_SECRET;
   if (!secret) {
-    throw new Error("SESSION_SECRET environment variable is required");
+    throw new Error("SESSION_SECRET or JWT_SECRET environment variable is required");
   }
   return secret;
 }
