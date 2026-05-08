@@ -46,16 +46,18 @@ const COUNTRY_MULTI_OPTIONS = ["Saudi Arabia", "UAE", "Kuwait", "Qatar", "Bahrai
 
 interface ProductFormData {
   name: string; description: string; minimumPurity: string; minimumQuantity: string; maximumQuantity: string;
-  appearance: string; categoryId: string; colors: string; deliverCountries: string; incoterms: string;
+  appearance: string; categoryIds: string[]; colors: string; deliverCountries: string; incoterms: string[];
   industries: string; packaging: string; units: string; substances: string; warehouses: string;
   deliveryLeadTime: string; countryOfOrigin: string; basePrice: string; availability: "in_stock" | "limited" | "out_of_stock";
+  technicalSpecsRaw: string;
 }
 
 const defaultForm: ProductFormData = {
   name: "", description: "", minimumPurity: "", minimumQuantity: "", maximumQuantity: "",
-  appearance: "", categoryId: "", colors: "", deliverCountries: "", incoterms: "",
+  appearance: "", categoryIds: [], colors: "", deliverCountries: "", incoterms: [],
   industries: "", packaging: "", units: "", substances: "", warehouses: "",
   deliveryLeadTime: "2-4 weeks", countryOfOrigin: "Saudi Arabia", basePrice: "", availability: "in_stock",
+  technicalSpecsRaw: "",
 };
 
 const PRODUCT_TEMPLATES = [
@@ -79,10 +81,13 @@ function ProductFormDialog({
   const getInitialForm = useCallback((): ProductFormData => (
     initial ? {
       name: initial.name ?? "", description: initial.description ?? "", minimumPurity: "",
-      minimumQuantity: String(initial.moq ?? ""), maximumQuantity: "", appearance: "", categoryId: String(initial.categoryId ?? ""), colors: "",
-      deliverCountries: "", incoterms: "", industries: "", packaging: initial.packaging ?? "", units: initial.moqUnit ?? "", substances: "",
+      minimumQuantity: String(initial.moq ?? ""), maximumQuantity: "", appearance: "", categoryIds: initial.categoryId ? [String(initial.categoryId)] : [], colors: "",
+      deliverCountries: "", incoterms: [], industries: "", packaging: initial.packaging ?? "", units: initial.moqUnit ?? "", substances: "",
       warehouses: "", deliveryLeadTime: initial.deliveryLeadTime ?? "2-4 weeks", countryOfOrigin: initial.countryOfOrigin ?? "Saudi Arabia",
       basePrice: initial.basePrice ? String(initial.basePrice) : "", availability: initial.availability ?? "in_stock",
+      technicalSpecsRaw: Array.isArray(initial.technicalSpecs)
+        ? initial.technicalSpecs.map((spec: any) => `${spec.name ?? ""}:${spec.value ?? ""}:${spec.unit ?? ""}`).join("\n")
+        : "",
     } : defaultForm
   ), [initial]);
   const [form, setForm] = useState<ProductFormData>(getInitialForm);
@@ -141,11 +146,36 @@ function ProductFormDialog({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const primaryCategoryId = parseInt(form.categoryIds[0] ?? "", 10);
+    if (!Number.isFinite(primaryCategoryId)) {
+      toast({ title: "Please select at least one category", variant: "destructive" });
+      return;
+    }
+
+    const selectedCategoryNames = categories
+      .filter((category) => form.categoryIds.includes(String(category.id)))
+      .map((category) => category.name);
+
+    const technicalSpecs = form.technicalSpecsRaw
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const [name = "", value = "", unit = ""] = line.split(":").map((part) => part.trim());
+        return { name, value, unit };
+      })
+      .filter((spec) => spec.name && spec.value);
+    const enrichedTechnicalSpecs = [
+      ...technicalSpecs,
+      ...form.incoterms.map((term) => ({ name: "Incoterm", value: term, unit: "" })),
+      ...selectedCategoryNames.slice(1).map((categoryName) => ({ name: "Additional Category", value: categoryName, unit: "" })),
+    ];
+
     const createPayload = {
       name: form.name,
       description: form.description,
       casNumber: form.substances || undefined,
-      categoryId: parseInt(form.categoryId, 10),
+      categoryId: primaryCategoryId,
       moq: parseFloat(form.minimumQuantity || "1"),
       moqUnit: form.units || "kg",
       basePrice: form.basePrice ? parseFloat(form.basePrice) : undefined,
@@ -157,8 +187,12 @@ function ProductFormDialog({
       packaging: form.packaging || undefined,
       pricingTiers: [],
       images: [],
-      applications: [],
-      technicalSpecs: [],
+      applications: [
+        ...selectedIndustries,
+        ...form.incoterms.map((term) => `Incoterm:${term}`),
+        ...selectedCategoryNames.slice(1).map((categoryName) => `Category:${categoryName}`),
+      ],
+      technicalSpecs: enrichedTechnicalSpecs,
     };
 
     const handlers = {
@@ -248,10 +282,28 @@ function ProductFormDialog({
                     </div>
                     <div className="space-y-1.5">
                       <Label>Category</Label>
-                      <select className="w-full h-10 rounded-md border bg-background px-3 text-sm" value={form.categoryId} onChange={f("categoryId")}>
-                        <option value="">Select category</option>
-                        {categories.map((category) => <option key={category.id} value={String(category.id)}>{category.name}</option>)}
-                      </select>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-2 rounded-md border p-3 max-h-48 overflow-y-auto">
+                        {categories.map((category) => {
+                          const id = String(category.id);
+                          return (
+                            <label key={category.id} className="flex items-center gap-2 text-sm cursor-pointer hover:text-foreground text-foreground/80">
+                              <input
+                                type="checkbox"
+                                className="accent-primary"
+                                checked={form.categoryIds.includes(id)}
+                                onChange={(e) => setForm((prev) => ({
+                                  ...prev,
+                                  categoryIds: e.target.checked
+                                    ? [...prev.categoryIds, id]
+                                    : prev.categoryIds.filter((value) => value !== id),
+                                }))}
+                              />
+                              {category.name}
+                            </label>
+                          );
+                        })}
+                      </div>
+                      <p className="text-xs text-muted-foreground">First selected category is used as the primary category.</p>
                     </div>
                   </div>
 
@@ -290,10 +342,24 @@ function ProductFormDialog({
                   <div className="grid gap-4 md:grid-cols-3">
                     <div className="space-y-1.5">
                       <Label>Incoterms</Label>
-                      <select className="w-full h-10 rounded-md border bg-background px-3 text-sm" value={form.incoterms} onChange={f("incoterms")}>
-                        <option value="">Select incoterm</option>
-                        {INCOTERM_OPTIONS.map(v => <option key={v}>{v}</option>)}
-                      </select>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-2 rounded-md border p-3">
+                        {INCOTERM_OPTIONS.map((term) => (
+                          <label key={term} className="flex items-center gap-2 text-sm cursor-pointer hover:text-foreground text-foreground/80">
+                            <input
+                              type="checkbox"
+                              className="accent-primary"
+                              checked={form.incoterms.includes(term)}
+                              onChange={(e) => setForm((prev) => ({
+                                ...prev,
+                                incoterms: e.target.checked
+                                  ? [...prev.incoterms, term]
+                                  : prev.incoterms.filter((value) => value !== term),
+                              }))}
+                            />
+                            {term}
+                          </label>
+                        ))}
+                      </div>
                     </div>
                     <div className="space-y-1.5">
                       <Label>Availability</Label>
@@ -303,6 +369,16 @@ function ProductFormDialog({
                         <option value="out_of_stock">Out of Stock</option>
                       </select>
                     </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label>Technical Specs</Label>
+                    <Textarea
+                      rows={4}
+                      value={form.technicalSpecsRaw}
+                      onChange={f("technicalSpecsRaw")}
+                      placeholder={"Format: Property:Value:Unit\nExample: Purity:99.5:%\nExample: Density:1.02:g/cm3"}
+                    />
                   </div>
 
                   {/* ── Row 6: Industries (multi-checkbox) ── */}

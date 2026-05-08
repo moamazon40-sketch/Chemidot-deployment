@@ -50,7 +50,11 @@ export function ProductCard({ product }: ProductCardProps) {
       
       <CardContent className="p-4 pt-0 flex-grow space-y-3">
         <div className="flex items-center text-sm text-muted-foreground">
-          <Link href={`/suppliers/${product.supplierId}`} className="hover:text-foreground flex items-center gap-1.5 transition-colors">
+          <Link
+            href={`/suppliers/${product.supplierId}`}
+            className="hover:text-foreground flex items-center gap-1.5 transition-colors"
+            onClick={(event) => event.stopPropagation()}
+          >
             <span className="truncate max-w-[140px]">{product.supplierName}</span>
             {product.supplierVerified && (
               <ShieldCheck className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />

@@ -15,6 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
+import { useEffect } from "react";
 
 function ContactSupplierDialog({ supplierId, supplierName, productName }: { supplierId: number; supplierName: string; productName: string }) {
   const { user, isLoading: authLoading } = useAuth();
@@ -84,6 +85,8 @@ export default function ProductDetail() {
   const { user, isLoading: authLoading } = useAuth();
   const [, navigate] = useLocation();
 
+  const [supplierDocuments, setSupplierDocuments] = useState<Array<{ id: number; title: string; type: string; fileUrl: string; fileSize?: string | null }>>([]);
+
   const { data: product, isLoading } = useGetProduct(id, {
     query: { enabled: !!id } as any
   });
@@ -120,6 +123,23 @@ export default function ProductDetail() {
       </MainLayout>
     );
   }
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadSupplierDocuments = async () => {
+      try {
+        const res = await fetch(`/api/suppliers/${product.supplierId}/documents`);
+        const data = res.ok ? await res.json() : [];
+        if (!cancelled) setSupplierDocuments(Array.isArray(data) ? data : []);
+      } catch {
+        if (!cancelled) setSupplierDocuments([]);
+      }
+    };
+    void loadSupplierDocuments();
+    return () => {
+      cancelled = true;
+    };
+  }, [product.supplierId]);
 
   const handleRfq = () => {
     if (authLoading) return;
@@ -238,6 +258,9 @@ export default function ProductDetail() {
                     <MotionCTAButton className="w-full" onClick={handleRfq}>
                       Request Quotation (RFQ)
                     </MotionCTAButton>
+                    <Button size="lg" variant="secondary" className="w-full" onClick={handleRfq}>
+                      Request Sample
+                    </Button>
                     <ContactSupplierDialog
                       supplierId={product.supplierId}
                       supplierName={product.supplierName}
@@ -303,16 +326,34 @@ export default function ProductDetail() {
                 )}
               </TabsContent>
               <TabsContent value="documents">
-                {product.sdsDocumentUrl ? (
-                  <a href={product.sdsDocumentUrl} target="_blank" rel="noreferrer" className="flex items-center gap-3 p-4 border rounded-lg hover:bg-muted/50 transition-colors w-fit">
-                    <div className="w-10 h-10 bg-red-100 text-red-600 rounded flex items-center justify-center">
-                      <FileText className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <div className="font-medium">Safety Data Sheet (SDS)</div>
-                      <div className="text-sm text-muted-foreground">PDF Document</div>
-                    </div>
-                  </a>
+                {supplierDocuments.length > 0 || product.sdsDocumentUrl ? (
+                  <div className="space-y-3 max-w-4xl">
+                    {supplierDocuments.map((doc) => (
+                      <a key={doc.id} href={doc.fileUrl} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-3 p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-red-100 text-red-600 rounded flex items-center justify-center">
+                            <FileText className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <div className="font-medium">{doc.title}</div>
+                            <div className="text-sm text-muted-foreground">{doc.type}{doc.fileSize ? ` • ${doc.fileSize}` : ""}</div>
+                          </div>
+                        </div>
+                        <span className="text-sm text-primary">Open</span>
+                      </a>
+                    ))}
+                    {product.sdsDocumentUrl && !supplierDocuments.some((doc) => doc.fileUrl === product.sdsDocumentUrl) ? (
+                      <a href={product.sdsDocumentUrl} target="_blank" rel="noreferrer" className="flex items-center gap-3 p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                        <div className="w-10 h-10 bg-red-100 text-red-600 rounded flex items-center justify-center">
+                          <FileText className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <div className="font-medium">Safety Data Sheet (SDS)</div>
+                          <div className="text-sm text-muted-foreground">PDF Document</div>
+                        </div>
+                      </a>
+                    ) : null}
+                  </div>
                 ) : (
                   <p className="text-muted-foreground italic">No documents available.</p>
                 )}
