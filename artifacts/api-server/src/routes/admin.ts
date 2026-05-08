@@ -8,37 +8,6 @@ import { AdminUpdateUserStatusBody } from "@workspace/api-zod";
 
 const router = Router();
 
-// Temporary bootstrap endpoint: promote the first admin user without needing an existing admin session.
-// Protected by a hard-coded secret and only promotes the email in ADMIN_EMAIL.
-//
-// NOTE: Remove this route after the first admin is promoted.
-router.post("/admin/promote-admin", asyncHandler(async (req, res) => {
-  const secret = String(req.header("x-admin-secret") ?? "");
-  if (secret !== "CHEMIDOT_ADMIN_PROMOTE_2026") {
-    res.status(403).json({ message: "Forbidden" });
-    return;
-  }
-
-  const email = String(process.env.ADMIN_EMAIL ?? "").trim().toLowerCase();
-  if (!email) {
-    res.status(400).json({ message: "ADMIN_EMAIL is not set" });
-    return;
-  }
-
-  const [updated] = await db
-    .update(usersTable)
-    .set({ role: "admin" as any, updatedAt: new Date() })
-    .where(eq(usersTable.email, email))
-    .returning();
-
-  if (!updated) {
-    res.status(404).json({ message: "User not found for ADMIN_EMAIL" });
-    return;
-  }
-
-  res.json({ ok: true, promotedEmail: updated.email, role: updated.role });
-}));
-
 
 router.get("/admin/users", requireAuth, requireRole("admin"), asyncHandler(async (req, res) => {
   const { role, status, page = "1", limit = "20" } = req.query as any;
