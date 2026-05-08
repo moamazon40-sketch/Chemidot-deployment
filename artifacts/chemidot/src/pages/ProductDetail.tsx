@@ -91,6 +91,32 @@ export default function ProductDetail() {
     query: { enabled: !!id } as any
   });
 
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!product?.supplierId) {
+      setSupplierDocuments([]);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const loadSupplierDocuments = async () => {
+      try {
+        const res = await fetch(`/api/suppliers/${product.supplierId}/documents`);
+        const data = res.ok ? await res.json() : [];
+        if (!cancelled) setSupplierDocuments(Array.isArray(data) ? data : []);
+      } catch {
+        if (!cancelled) setSupplierDocuments([]);
+      }
+    };
+
+    void loadSupplierDocuments();
+    return () => {
+      cancelled = true;
+    };
+  }, [product?.supplierId]);
+
   if (isLoading) {
     return (
       <MainLayout>
@@ -123,23 +149,6 @@ export default function ProductDetail() {
       </MainLayout>
     );
   }
-
-  useEffect(() => {
-    let cancelled = false;
-    const loadSupplierDocuments = async () => {
-      try {
-        const res = await fetch(`/api/suppliers/${product.supplierId}/documents`);
-        const data = res.ok ? await res.json() : [];
-        if (!cancelled) setSupplierDocuments(Array.isArray(data) ? data : []);
-      } catch {
-        if (!cancelled) setSupplierDocuments([]);
-      }
-    };
-    void loadSupplierDocuments();
-    return () => {
-      cancelled = true;
-    };
-  }, [product.supplierId]);
 
   const handleRfq = () => {
     if (authLoading) return;
