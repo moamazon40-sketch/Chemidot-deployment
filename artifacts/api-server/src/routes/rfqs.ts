@@ -2,11 +2,15 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { rfqsTable, usersTable, quotationsTable, suppliersTable, ordersTable, productsTable, categoriesTable, negotiationMessagesTable } from "@workspace/db";
 import { eq, and, sql, desc, inArray, or, ilike } from "drizzle-orm";
-import { requireAuth } from "../middlewares/auth";
+import { requireAuth, requireRole } from "../middlewares/auth";
 import { asyncHandler } from "../middlewares/asyncHandler";
 import { CreateRfqBody, UpdateRfqBody, SubmitQuotationBody, SendNegotiationMessageBody } from "@workspace/api-zod";
 
 const router = Router();
+
+function httpError(message: string, statusCode: number) {
+  return Object.assign(new Error(message), { statusCode });
+}
 
 function buildRfq(r: any, quotationCount: number, buyerCompanyName: string) {
   return {
@@ -150,7 +154,7 @@ router.get("/rfqs", requireAuth, asyncHandler(async (req, res) => {
   });
 }));
 
-router.post("/rfqs", requireAuth, asyncHandler(async (req, res) => {
+router.post("/rfqs", requireAuth, requireRole("buyer", "admin"), asyncHandler(async (req, res) => {
   const user = (req as any).user;
   const parsed = CreateRfqBody.safeParse(req.body);
   if (!parsed.success) {
@@ -252,11 +256,19 @@ router.delete("/rfqs/:id", requireAuth, asyncHandler(async (req, res) => {
     res.status(400).json({ message: "Cannot delete an awarded RFQ" });
     return;
   }
-  // Use transaction to prevent orphaned quotations
+  // Use transaction to prevent orphaned quotation and negotiation records.
   await db.transaction(async (tx) => {
-    // Delete quotations first (foreign key constraint)
+    const quotationRows = await tx.select({ id: quotationsTable.id })
+      .from(quotationsTable)
+      .where(eq(quotationsTable.rfqId, id));
+    const quotationIds = quotationRows.map((row) => row.id);
+
+    if (quotationIds.length > 0) {
+      await tx.delete(negotiationMessagesTable)
+        .where(inArray(negotiationMessagesTable.quotationId, quotationIds));
+    }
+
     await tx.delete(quotationsTable).where(eq(quotationsTable.rfqId, id));
-    // Then delete the RFQ
     await tx.delete(rfqsTable).where(eq(rfqsTable.id, id));
   });
   res.status(204).send();
@@ -342,7 +354,7 @@ router.get("/rfqs/:id/quotations", requireAuth, asyncHandler(async (req, res) =>
   })));
 }));
 
-router.post("/rfqs/:id/quotations", requireAuth, asyncHandler(async (req, res) => {
+router.post("/rfqs/:id/quotations", requireAuth, requireRole("supplier", "admin"), asyncHandler(async (req, res) => {
   const user = (req as any).user;
   const rfqId = parseInt(String(req.params.id));
   const parsed = SubmitQuotationBody.safeParse(req.body);
@@ -430,12 +442,12 @@ router.post("/rfqs/:id/quotations/:qid/accept", requireAuth, asyncHandler(async 
     // Check RFQ status and ownership
     const [rfq] = await tx.select().from(rfqsTable).where(eq(rfqsTable.id, rfqId)).limit(1);
     if (!rfq || rfq.buyerId !== user.id) {
-      throw new Error("Forbidden");
+      throw httpError("Forbidden", 403);
     }
 
     // Prevent accepting quotations for already awarded/closed RFQs
     if (rfq.status === "awarded" || rfq.status === "closed") {
-      throw new Error("RFQ already awarded or closed");
+      throw httpError("RFQ already awarded or closed", 400);
     }
 
     const [quotation] = await tx.select().from(quotationsTable)
@@ -443,17 +455,17 @@ router.post("/rfqs/:id/quotations/:qid/accept", requireAuth, asyncHandler(async 
       .where(and(eq(quotationsTable.id, qid), eq(quotationsTable.rfqId, rfqId))).limit(1);
 
     if (!quotation) {
-      throw new Error("Quotation not found");
+      throw httpError("Quotation not found", 404);
     }
 
     // Check if quotation is still valid
     if (quotation.quotations.validUntil && new Date(quotation.quotations.validUntil) < new Date()) {
-      throw new Error("Quotation has expired");
+      throw httpError("Quotation has expired", 400);
     }
 
     // Check if quotation is still pending
     if (quotation.quotations.status !== "pending") {
-      throw new Error("Quotation no longer available");
+      throw httpError("Quotation no longer available", 400);
     }
 
     const totalPrice = parseFloat(quotation.quotations.pricePerUnit) * parseFloat(rfq.quantity);

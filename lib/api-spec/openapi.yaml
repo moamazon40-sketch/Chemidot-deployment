@@ -1510,12 +1510,26 @@ components:
       properties:
         name:
           type: string
+        casNumber:
+          type: string
         description:
           type: string
+        categoryId:
+          type: integer
+        imageUrl:
+          type: string
+        images:
+          type: array
+          items:
+            type: string
         moq:
           type: number
+        moqUnit:
+          type: string
         basePrice:
           type: number
+        currency:
+          type: string
         availability:
           type: string
           enum: [in_stock, limited, out_of_stock]
@@ -1523,6 +1537,22 @@ components:
           type: string
         collectiveEligible:
           type: boolean
+        countryOfOrigin:
+          type: string
+        technicalSpecs:
+          type: array
+          items:
+            $ref: "#/components/schemas/TechnicalSpec"
+        pricingTiers:
+          type: array
+          items:
+            $ref: "#/components/schemas/PricingTier"
+        applications:
+          type: array
+          items:
+            type: string
+        packaging:
+          type: string
 
     TrendingData:
       type: object

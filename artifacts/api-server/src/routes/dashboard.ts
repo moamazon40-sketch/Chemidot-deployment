@@ -81,7 +81,14 @@ router.get("/dashboard/buyer-stats", requireAuth, asyncHandler(async (req, res) 
     db.select({ count: sql<number>`cast(count(*) as int)` }).from(rfqsTable).where(eq(rfqsTable.buyerId, user.id)),
     db.select({ count: sql<number>`cast(count(*) as int)` }).from(ordersTable).where(eq(ordersTable.buyerId, user.id)),
     db.select({ count: sql<number>`cast(count(*) as int)` }).from(collectiveOrderParticipantsTable).where(eq(collectiveOrderParticipantsTable.buyerId, user.id)),
-    db.select({ count: sql<number>`cast(count(*) as int)` }).from(messagesTable).where(and(eq(messagesTable.isRead, false), sql`${messagesTable.senderId} != ${user.id}`)),
+    db.select({ count: sql<number>`cast(count(*) as int)` })
+      .from(messagesTable)
+      .leftJoin(conversationsTable, eq(conversationsTable.id, messagesTable.conversationId))
+      .where(and(
+        eq(messagesTable.isRead, false),
+        ne(messagesTable.senderId, user.id),
+        or(eq(conversationsTable.buyerId, user.id), eq(conversationsTable.supplierId, user.id)),
+      )),
   ]);
 
   const activeRfqs = await db.select({ count: sql<number>`cast(count(*) as int)` }).from(rfqsTable).where(and(eq(rfqsTable.buyerId, user.id), eq(rfqsTable.status, "active")));

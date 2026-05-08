@@ -73,35 +73,24 @@ app.use("/api/auth/register", authLimiter);
 const uploadDir = process.env.VERCEL
   ? "/tmp/uploads"
   : path.join(process.cwd(), "public", "uploads");
-
+if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 app.use("/api/uploads", express.static(uploadDir));
+
 app.use("/api", router);
 
-// Serve the built Chemidot frontend from the same Render service.
-// This keeps deployment simple: one live URL hosts both the website and the API.
-const frontendDistCandidates = [
-  path.resolve(process.cwd(), "../chemidot/dist/public"),
-  path.resolve(process.cwd(), "artifacts/chemidot/dist/public"),
-  path.resolve(process.cwd(), "../../artifacts/chemidot/dist/public"),
-];
-const frontendDist = frontendDistCandidates.find((candidate) => fs.existsSync(candidate));
-
-if (frontendDist) {
-  app.use(express.static(frontendDist));
-
-  app.get(/^(?!\/api).*/, (_req: Request, res: Response) => {
-    res.sendFile(path.join(frontendDist, "index.html"));
-  });
-}
-
-
-app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
-  req.log.error({
+app.use((err: Error & { statusCode?: number; status?: number; code?: string }, req: Request, res: Response, _next: NextFunction) => {
+  const status = err.statusCode ?? err.status ?? (err.code === "LIMIT_FILE_SIZE" ? 400 : 500);
+  const isClientError = status >= 400 && status < 500;
+  req.log[isClientError ? "warn" : "error"]({
     err,
     path: req.originalUrl,
     method: req.method,
-  }, "Unhandled error");
-  res.status(500).json({ message: "Internal server error" });
+    status,
+  }, isClientError ? "Request failed" : "Unhandled error");
+
+  res.status(status).json({
+    message: isClientError ? err.message : "Internal server error",
+  });
 });
 
 export default app;

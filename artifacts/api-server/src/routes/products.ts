@@ -2,9 +2,9 @@ import { Router } from "express";
 import multer from "multer";
 import { db } from "@workspace/db";
 import {
-  productsTable, suppliersTable, categoriesTable, reviewsTable
+  productsTable, suppliersTable, categoriesTable
 } from "@workspace/db";
-import { eq, and, or, like, gte, lte, sql, desc, asc, ilike } from "drizzle-orm";
+import { eq, and, or, gte, lte, sql, desc, asc, ilike } from "drizzle-orm";
 import { requireAuth, requireRole, optionalAuth } from "../middlewares/auth";
 import { asyncHandler } from "../middlewares/asyncHandler";
 import { CreateProductBody, UpdateProductBody } from "@workspace/api-zod";
@@ -81,6 +81,20 @@ function normalizeCreateProductBody(body: Record<string, unknown>) {
   };
 }
 
+function normalizeUpdateProductBody(body: Record<string, unknown>) {
+  return {
+    ...body,
+    categoryId: parseOptionalNumber(body.categoryId),
+    moq: parseOptionalNumber(body.moq),
+    basePrice: parseOptionalNumber(body.basePrice),
+    collectiveEligible: parseOptionalBoolean(body.collectiveEligible),
+    images: parseOptionalStringArray(body.images),
+    applications: parseOptionalStringArray(body.applications),
+    technicalSpecs: parseOptionalJsonArray(body.technicalSpecs),
+    pricingTiers: parseOptionalJsonArray(body.pricingTiers),
+  };
+}
+
 function getDbErrorMessage(error: unknown): string | null {
   if (!error || typeof error !== "object") return null;
   const code = "code" in error ? String((error as { code?: unknown }).code ?? "") : "";
@@ -117,6 +131,13 @@ function buildProductShape(p: any, s: any, c: any, reviewCount: number, rating: 
     collectiveEligible: p.collectiveEligible,
     rating,
     reviewCount,
+    images: p.images ?? [],
+    technicalSpecs: p.technicalSpecs ?? [],
+    pricingTiers: p.pricingTiers ?? [],
+    applications: p.applications ?? [],
+    packaging: p.packaging,
+    countryOfOrigin: p.countryOfOrigin,
+    sdsDocumentUrl: p.sdsDocumentUrl,
     createdAt: p.createdAt.toISOString(),
   };
 }
@@ -190,6 +211,10 @@ router.get("/products", optionalAuth, asyncHandler(async (req, res) => {
   if (supplierId) conditions.push(eq(productsTable.supplierId, parseInt(supplierId)));
   if (minMoq) conditions.push(gte(productsTable.moq, minMoq));
   if (maxMoq) conditions.push(lte(productsTable.moq, maxMoq));
+  if (minPrice) conditions.push(gte(productsTable.basePrice, String(minPrice)));
+  if (maxPrice) conditions.push(lte(productsTable.basePrice, String(maxPrice)));
+  if (country) conditions.push(eq(suppliersTable.country, String(country)));
+  if (verifiedSupplier === "true") conditions.push(eq(suppliersTable.verified, true));
   if (collectiveEligible === "true") conditions.push(eq(productsTable.collectiveEligible, true));
 
   const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
@@ -209,6 +234,7 @@ router.get("/products", optionalAuth, asyncHandler(async (req, res) => {
       .offset(offset),
     db.select({ count: sql<number>`cast(count(*) as int)` })
       .from(productsTable)
+      .leftJoin(suppliersTable, eq(suppliersTable.id, productsTable.supplierId))
       .where(whereClause),
   ]);
 
@@ -362,9 +388,15 @@ router.post("/products", parseProductRequest, requireAuth, requireRole("supplier
 router.put("/products/:id", requireAuth, requireRole("supplier"), asyncHandler(async (req, res) => {
   const user = (req as any).user;
   const id = parseInt(String(req.params.id));
-  const parsed = UpdateProductBody.safeParse(req.body);
+  const parsed = UpdateProductBody.safeParse(normalizeUpdateProductBody(req.body as Record<string, unknown>));
   if (!parsed.success) {
-    res.status(400).json({ message: "Invalid request body" });
+    res.status(400).json({
+      message: "Invalid request body",
+      issues: parsed.error.issues.map((issue) => ({
+        path: issue.path.join("."),
+        message: issue.message,
+      })),
+    });
     return;
   }
 
@@ -386,16 +418,53 @@ router.put("/products/:id", requireAuth, requireRole("supplier"), asyncHandler(a
 
   const updates: any = {};
   const body = parsed.data;
-  if (body.name) updates.name = body.name;
-  if (body.description) updates.description = body.description;
-  if (body.moq) updates.moq = String(body.moq);
-  if (body.basePrice) updates.basePrice = String(body.basePrice);
-  if (body.availability) updates.availability = body.availability;
-  if (body.deliveryLeadTime) updates.deliveryLeadTime = body.deliveryLeadTime;
+  if (body.categoryId !== undefined) {
+    const [category] = await db.select().from(categoriesTable).where(eq(categoriesTable.id, body.categoryId)).limit(1);
+    if (!category) {
+      res.status(400).json({ message: "Selected category does not exist" });
+      return;
+    }
+    updates.categoryId = body.categoryId;
+  }
+  if (body.name !== undefined) updates.name = body.name.trim();
+  if (body.description !== undefined) updates.description = body.description.trim();
+  if (body.casNumber !== undefined) updates.casNumber = body.casNumber?.trim() || null;
+  if (body.imageUrl !== undefined) updates.imageUrl = body.imageUrl?.trim() || null;
+  if (body.images !== undefined) updates.images = body.images;
+  if (body.moq !== undefined) updates.moq = String(body.moq);
+  if (body.moqUnit !== undefined) updates.moqUnit = body.moqUnit.trim();
+  if (body.basePrice !== undefined) updates.basePrice = body.basePrice === null ? null : String(body.basePrice);
+  if (body.currency !== undefined) updates.currency = body.currency.trim() || "USD";
+  if (body.availability !== undefined) updates.availability = body.availability;
+  if (body.deliveryLeadTime !== undefined) updates.deliveryLeadTime = body.deliveryLeadTime.trim();
   if (body.collectiveEligible !== undefined) updates.collectiveEligible = body.collectiveEligible;
+  if (body.countryOfOrigin !== undefined) updates.countryOfOrigin = body.countryOfOrigin.trim();
+  if (body.packaging !== undefined) updates.packaging = body.packaging?.trim() || null;
+  if (body.technicalSpecs !== undefined) updates.technicalSpecs = body.technicalSpecs;
+  if (body.pricingTiers !== undefined) updates.pricingTiers = body.pricingTiers;
+  if (body.applications !== undefined) updates.applications = body.applications;
   updates.updatedAt = new Date();
 
-  await db.update(productsTable).set(updates).where(eq(productsTable.id, id));
+  try {
+    await db.update(productsTable).set(updates).where(eq(productsTable.id, id));
+  } catch (error) {
+    req.log.error({
+      err: error,
+      userId: user.id,
+      supplierId: supplier.id,
+      productId: id,
+      route: "PUT /api/products/:id",
+    }, "Product update failed");
+
+    const message = getDbErrorMessage(error);
+    if (message) {
+      res.status(400).json({ message });
+      return;
+    }
+
+    throw error;
+  }
+
   const [row] = await db.select().from(productsTable)
     .leftJoin(suppliersTable, eq(suppliersTable.id, productsTable.supplierId))
     .leftJoin(categoriesTable, eq(categoriesTable.id, productsTable.categoryId))

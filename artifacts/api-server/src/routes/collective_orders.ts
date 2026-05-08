@@ -5,11 +5,15 @@ import {
   productsTable, suppliersTable, categoriesTable, usersTable
 } from "@workspace/db";
 import { eq, and, sql, desc } from "drizzle-orm";
-import { requireAuth } from "../middlewares/auth";
+import { requireAuth, requireRole } from "../middlewares/auth";
 import { asyncHandler } from "../middlewares/asyncHandler";
 import { CreateCollectiveOrderBody, JoinCollectiveOrderBody } from "@workspace/api-zod";
 
 const router = Router();
+
+function httpError(message: string, statusCode: number) {
+  return Object.assign(new Error(message), { statusCode });
+}
 
 function getPricingTiers(tiers: any[], currentQty: number) {
   let currentTier = "Base Price";
@@ -74,6 +78,8 @@ router.get("/collective-orders", asyncHandler(async (req, res) => {
 
   const conditions: any[] = [];
   if (status) conditions.push(eq(collectiveOrdersTable.status, status));
+  if (categoryId) conditions.push(eq(productsTable.categoryId, parseInt(categoryId)));
+  if (region) conditions.push(eq(collectiveOrdersTable.deliveryRegion, String(region)));
 
   const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
@@ -84,7 +90,10 @@ router.get("/collective-orders", asyncHandler(async (req, res) => {
       .where(whereClause)
       .orderBy(desc(collectiveOrdersTable.createdAt))
       .limit(limitNum).offset(offset),
-    db.select({ count: sql<number>`cast(count(*) as int)` }).from(collectiveOrdersTable).where(whereClause),
+    db.select({ count: sql<number>`cast(count(*) as int)` })
+      .from(collectiveOrdersTable)
+      .leftJoin(productsTable, eq(productsTable.id, collectiveOrdersTable.productId))
+      .where(whereClause),
   ]);
 
   const total = countResult[0]?.count ?? 0;
@@ -97,7 +106,7 @@ router.get("/collective-orders", asyncHandler(async (req, res) => {
   });
 }));
 
-router.post("/collective-orders", requireAuth, asyncHandler(async (req, res) => {
+router.post("/collective-orders", requireAuth, requireRole("supplier", "admin"), asyncHandler(async (req, res) => {
   const user = (req as any).user;
   const parsed = CreateCollectiveOrderBody.safeParse(req.body);
   if (!parsed.success) {
@@ -134,17 +143,21 @@ router.post("/collective-orders", requireAuth, asyncHandler(async (req, res) => 
     return;
   }
   
-    // TODO: Add product ownership validation after schema regeneration
-    // if (body.productId) {
-    //   const [product] = await db.select().from(productsTable)
-    //     .where(and(eq(productsTable.id, body.productId), eq(productsTable.supplierId, supplier.id)))
-    //     .limit(1);
-    //   
-    //   if (!product) {
-    //     res.status(403).json({ message: "You can only create collective orders for your own products" });
-    //     return;
-    //   }
-    // }
+  if (body.productId) {
+    const [product] = await db.select().from(productsTable)
+      .where(eq(productsTable.id, body.productId))
+      .limit(1);
+
+    if (!product) {
+      res.status(400).json({ message: "Selected product does not exist" });
+      return;
+    }
+
+    if (product.supplierId !== supplier.id) {
+      res.status(403).json({ message: "You can only create collective orders for your own products" });
+      return;
+    }
+  }
   
   // Use first pricing tier as base price (fix pricing logic)
   const basePrice = body.pricingTiers[0].pricePerUnit;
@@ -258,23 +271,23 @@ router.post("/collective-orders/:id/join", requireAuth, asyncHandler(async (req,
   const result = await db.transaction(async (tx) => {
     const [co] = await tx.select().from(collectiveOrdersTable).where(eq(collectiveOrdersTable.id, id)).limit(1);
     if (!co) {
-      throw new Error("Collective order not found");
+      throw httpError("Collective order not found", 404);
     }
     
     // Check if order is still open for joining
     if (co.status !== "open") {
-      throw new Error("Cannot join an order that is not open");
+      throw httpError("Cannot join an order that is not open", 400);
     }
     
     // Check if deadline has passed
     if (new Date(co.deadline) <= new Date()) {
-      throw new Error("Cannot join an order that has expired");
+      throw httpError("Cannot join an order that has expired", 400);
     }
     
     // Check MOQ requirements
     const moqPer = parseFloat(co.moqPerParticipant);
     if (body.quantity < moqPer) {
-      throw new Error(`Quantity must be at least ${moqPer} ${co.unit}`);
+      throw httpError(`Quantity must be at least ${moqPer} ${co.unit}`, 400);
     }
     
     // Check if user already joined
@@ -285,7 +298,7 @@ router.post("/collective-orders/:id/join", requireAuth, asyncHandler(async (req,
       )).limit(1);
       
     if (existingParticipant) {
-      throw new Error("You have already joined this collective order");
+      throw httpError("You have already joined this collective order", 400);
     }
     
     // Add participant
@@ -332,7 +345,7 @@ router.post("/collective-orders/:id/leave", requireAuth, asyncHandler(async (req
       )).limit(1);
       
     if (!participant) {
-      throw new Error("You are not a participant in this collective order");
+      throw httpError("You are not a participant in this collective order", 400);
     }
     
     // Get current order details
@@ -340,7 +353,7 @@ router.post("/collective-orders/:id/leave", requireAuth, asyncHandler(async (req
       .where(eq(collectiveOrdersTable.id, id)).limit(1);
       
     if (!co) {
-      throw new Error("Collective order not found");
+      throw httpError("Collective order not found", 404);
     }
     
     // Remove participant

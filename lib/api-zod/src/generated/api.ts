@@ -343,12 +343,40 @@ export const UpdateProductParams = zod.object({
 
 export const UpdateProductBody = zod.object({
   name: zod.string().optional(),
+  casNumber: zod.string().optional(),
   description: zod.string().optional(),
+  categoryId: zod.number().optional(),
+  imageUrl: zod.string().optional(),
+  images: zod.array(zod.string()).optional(),
   moq: zod.number().optional(),
+  moqUnit: zod.string().optional(),
   basePrice: zod.number().optional(),
+  currency: zod.string().optional(),
   availability: zod.enum(["in_stock", "limited", "out_of_stock"]).optional(),
   deliveryLeadTime: zod.string().optional(),
   collectiveEligible: zod.boolean().optional(),
+  countryOfOrigin: zod.string().optional(),
+  technicalSpecs: zod
+    .array(
+      zod.object({
+        name: zod.string(),
+        value: zod.string(),
+        unit: zod.string().nullish(),
+      }),
+    )
+    .optional(),
+  pricingTiers: zod
+    .array(
+      zod.object({
+        minQuantity: zod.number(),
+        maxQuantity: zod.number().nullish(),
+        pricePerUnit: zod.number(),
+        discountPercent: zod.number(),
+      }),
+    )
+    .optional(),
+  applications: zod.array(zod.string()).optional(),
+  packaging: zod.string().optional(),
 });
 
 export const UpdateProductResponse = zod.object({

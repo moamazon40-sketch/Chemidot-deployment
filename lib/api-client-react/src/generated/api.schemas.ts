@@ -204,12 +204,23 @@ export const UpdateProductBodyAvailability = {
 
 export interface UpdateProductBody {
   name?: string;
+  casNumber?: string;
   description?: string;
+  categoryId?: number;
+  imageUrl?: string;
+  images?: string[];
   moq?: number;
+  moqUnit?: string;
   basePrice?: number;
+  currency?: string;
   availability?: UpdateProductBodyAvailability;
   deliveryLeadTime?: string;
   collectiveEligible?: boolean;
+  countryOfOrigin?: string;
+  technicalSpecs?: TechnicalSpec[];
+  pricingTiers?: PricingTier[];
+  applications?: string[];
+  packaging?: string;
 }
 
 export interface TrendingData {

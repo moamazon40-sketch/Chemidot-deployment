@@ -9,7 +9,7 @@
       "destination": "/api/[...]?_vc_api_path=:path*"
     },
     {
-      "source": "/:path((?!api/).*)",
+      "source": "/:path*",
       "destination": "/index.html"
     }
   ]

@@ -78,18 +78,37 @@ function ProductFormDialog({
   const updateProduct = useUpdateProduct();
   const { data: categories = [] } = useListCategories();
   const { toast } = useToast();
-  const getInitialForm = useCallback((): ProductFormData => (
-    initial ? {
+  const getInitialForm = useCallback((): ProductFormData => {
+    if (!initial) return defaultForm;
+
+    const specs = Array.isArray(initial.technicalSpecs) ? initial.technicalSpecs : [];
+    const applications = Array.isArray(initial.applications) ? initial.applications : [];
+    const incoterms = Array.from(new Set([
+      ...specs.filter((spec: any) => spec.name === "Incoterm").map((spec: any) => String(spec.value)),
+      ...applications.filter((value: string) => value.startsWith("Incoterm:")).map((value: string) => value.replace("Incoterm:", "")),
+    ])).filter(Boolean);
+    const additionalCategoryNames = [
+      ...specs.filter((spec: any) => spec.name === "Additional Category").map((spec: any) => String(spec.value)),
+      ...applications.filter((value: string) => value.startsWith("Category:")).map((value: string) => value.replace("Category:", "")),
+    ];
+    const categoryIds = [
+      ...(initial.categoryId ? [String(initial.categoryId)] : []),
+      ...categories
+        .filter((category) => additionalCategoryNames.includes(category.name))
+        .map((category) => String(category.id)),
+    ];
+
+    return {
       name: initial.name ?? "", description: initial.description ?? "", minimumPurity: "",
-      minimumQuantity: String(initial.moq ?? ""), maximumQuantity: "", appearance: "", categoryIds: initial.categoryId ? [String(initial.categoryId)] : [], colors: "",
-      deliverCountries: "", incoterms: [], industries: "", packaging: initial.packaging ?? "", units: initial.moqUnit ?? "", substances: "",
+      minimumQuantity: String(initial.moq ?? ""), maximumQuantity: "", appearance: "", categoryIds: Array.from(new Set(categoryIds)), colors: "",
+      deliverCountries: "", incoterms, industries: "", packaging: initial.packaging ?? "", units: initial.moqUnit ?? "", substances: initial.casNumber ?? "",
       warehouses: "", deliveryLeadTime: initial.deliveryLeadTime ?? "2-4 weeks", countryOfOrigin: initial.countryOfOrigin ?? "Saudi Arabia",
-      basePrice: initial.basePrice ? String(initial.basePrice) : "", availability: initial.availability ?? "in_stock",
-      technicalSpecsRaw: Array.isArray(initial.technicalSpecs)
-        ? initial.technicalSpecs.map((spec: any) => `${spec.name ?? ""}:${spec.value ?? ""}:${spec.unit ?? ""}`).join("\n")
-        : "",
-    } : defaultForm
-  ), [initial]);
+      basePrice: initial.basePrice !== null && initial.basePrice !== undefined ? String(initial.basePrice) : "", availability: initial.availability ?? "in_stock",
+      technicalSpecsRaw: specs
+        .filter((spec: any) => spec.name !== "Incoterm" && spec.name !== "Additional Category")
+        .map((spec: any) => `${spec.name ?? ""}:${spec.value ?? ""}:${spec.unit ?? ""}`).join("\n"),
+    };
+  }, [initial, categories]);
   const [form, setForm] = useState<ProductFormData>(getInitialForm);
   const [selectedCountries, setSelectedCountries] = useState<string[]>(["Saudi Arabia"]);
   const [selectedIndustries, setSelectedIndustries] = useState<string[]>([]);
@@ -102,8 +121,14 @@ function ProductFormDialog({
   const [dragOver, setDragOver] = useState(false);
 
   useEffect(() => {
-    setForm(getInitialForm());
-  }, [getInitialForm, open]);
+    const nextForm = getInitialForm();
+    setForm(nextForm);
+    const applications = Array.isArray(initial?.applications) ? initial.applications : [];
+    setSelectedIndustries(applications.filter((value: string) => !value.startsWith("Incoterm:") && !value.startsWith("Category:")));
+    setSelectedCountries(initial?.countryOfOrigin ? [initial.countryOfOrigin] : ["Saudi Arabia"]);
+    setSelectedWarehouses([]);
+    setDocFiles({});
+  }, [getInitialForm, open, initial]);
 
   const handleDocSelect = (docName: string, file: File | null) => {
     setDocFiles(prev => ({ ...prev, [docName]: file ?? null }));
@@ -211,15 +236,7 @@ function ProductFormDialog({
     if (initial?.id) {
       updateProduct.mutate({
         id: initial.id,
-        data: {
-          name: form.name,
-          description: form.description,
-          moq: parseFloat(form.minimumQuantity || "1"),
-          basePrice: form.basePrice ? parseFloat(form.basePrice) : undefined,
-          availability: form.availability,
-          deliveryLeadTime: form.deliveryLeadTime,
-          collectiveEligible: false,
-        }
+        data: createPayload,
       }, handlers);
       return;
     }
@@ -586,6 +603,19 @@ export default function SupplierProducts() {
   );
   const deleteMutation = useDeleteProduct();
 
+  const handleEdit = async (product: any) => {
+    setFormOpen(true);
+    setEditingProduct(product);
+    try {
+      const res = await fetch(`/api/products/${product.id}`);
+      if (!res.ok) throw new Error("Could not load product details");
+      const detail = await res.json();
+      setEditingProduct({ ...product, ...detail });
+    } catch {
+      toast({ title: "Loaded basic product details", description: "Some advanced fields may need to be re-entered.", variant: "destructive" });
+    }
+  };
+
   const handleDelete = (id: number) => {
     if (!confirm("Delete this product? This cannot be undone.")) return;
     deleteMutation.mutate({ id }, {
@@ -662,7 +692,7 @@ export default function SupplierProducts() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => { setEditingProduct(p); setFormOpen(true); }}>
+                        <DropdownMenuItem onClick={() => { void handleEdit(p); }}>
                           <Edit className="w-4 h-4 mr-2" /> Edit
                         </DropdownMenuItem>
                         <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(p.id)}>
