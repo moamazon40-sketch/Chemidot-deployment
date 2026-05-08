@@ -1,4 +1,4 @@
-import { Link } from "wouter";
+import { useLocation } from "wouter";
 import { Product } from "@workspace/api-client-react";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,9 +11,15 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ product }: ProductCardProps) {
+  const [, navigate] = useLocation();
+
   return (
     <Card className="flex flex-col overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-1 group">
-      <Link href={`/products/${product.id}`} className="block relative aspect-square overflow-hidden bg-muted">
+      <button
+        type="button"
+        onClick={() => navigate(`/products/${product.id}`)}
+        className="block relative aspect-square overflow-hidden bg-muted text-left"
+      >
         {product.imageUrl ? (
           <img 
             src={product.imageUrl} 
@@ -32,7 +38,7 @@ export function ProductCard({ product }: ProductCardProps) {
             </Badge>
           </div>
         )}
-      </Link>
+      </button>
       
       <CardHeader className="p-4 pb-2 space-y-1 flex-none">
         <div className="flex justify-between items-start gap-2">
@@ -43,23 +49,27 @@ export function ProductCard({ product }: ProductCardProps) {
             {formatCasNumber(product.casNumber)}
           </span>
         </div>
-        <Link href={`/products/${product.id}`} className="hover:text-primary transition-colors">
+        <button
+          type="button"
+          onClick={() => navigate(`/products/${product.id}`)}
+          className="hover:text-primary transition-colors text-left"
+        >
           <h3 className="font-bold line-clamp-2 leading-tight mt-1">{product.name}</h3>
-        </Link>
+        </button>
       </CardHeader>
       
       <CardContent className="p-4 pt-0 flex-grow space-y-3">
         <div className="flex items-center text-sm text-muted-foreground">
-          <Link
-            href={`/suppliers/${product.supplierId}`}
+          <button
+            type="button"
             className="hover:text-foreground flex items-center gap-1.5 transition-colors"
-            onClick={(event) => event.stopPropagation()}
+            onClick={() => navigate(`/suppliers/${product.supplierId}`)}
           >
             <span className="truncate max-w-[140px]">{product.supplierName}</span>
             {product.supplierVerified && (
               <ShieldCheck className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
             )}
-          </Link>
+          </button>
           <span className="mx-2 text-border">•</span>
           <span className="truncate">{product.supplierCountry}</span>
         </div>
@@ -81,12 +91,15 @@ export function ProductCard({ product }: ProductCardProps) {
       </CardContent>
       
       <CardFooter className="p-4 pt-0 mt-auto">
-        <Link href={`/products/${product.id}`} className="w-full">
-          <Button variant="secondary" className="w-full justify-between group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-            View Details
-            <ArrowRight className="w-4 h-4 ml-2" />
-          </Button>
-        </Link>
+        <Button
+          type="button"
+          variant="secondary"
+          className="w-full justify-between group-hover:bg-primary group-hover:text-primary-foreground transition-colors"
+          onClick={() => navigate(`/products/${product.id}`)}
+        >
+          View Details
+          <ArrowRight className="w-4 h-4 ml-2" />
+        </Button>
       </CardFooter>
     </Card>
   );
