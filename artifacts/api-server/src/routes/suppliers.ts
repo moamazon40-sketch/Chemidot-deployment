@@ -18,10 +18,20 @@ import multer from "multer";
 
 const router = Router();
 
-const uploadDir = process.env.VERCEL
-  ? "/tmp/uploads"
-  : path.join(process.cwd(), "public", "uploads");
-if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+const primaryUploadDir = path.join(process.cwd(), "public", "uploads");
+const tmpUploadDir = "/tmp/uploads";
+let uploadDir =
+  process.env.VERCEL || process.env.VERCEL_ENV || process.env.AWS_LAMBDA_FUNCTION_NAME
+    ? tmpUploadDir
+    : primaryUploadDir;
+
+// Vercel Functions run from a read-only filesystem (/var/task). Only /tmp is writable.
+try {
+  if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+} catch {
+  uploadDir = tmpUploadDir;
+  if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+}
 
 const ALLOWED_MIME_TYPES = new Set([
   "image/jpeg",
