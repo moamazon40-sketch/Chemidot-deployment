@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, pool } from "@workspace/db";
+import { db } from "@workspace/db";
 import { usersTable, suppliersTable, productsTable, rfqsTable, ordersTable, collectiveOrdersTable } from "@workspace/db";
 import { eq, sql, desc, and } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/auth";
@@ -8,60 +8,6 @@ import { AdminUpdateUserStatusBody } from "@workspace/api-zod";
 
 const router = Router();
 
-// TEMPORARY: remove after one-time cleanup.
-const TEMP_CLEANUP_SECRET = "CHEMIDOT_ADMIN_CLEANUP_2026";
-
-router.post("/admin/cleanup-test-data", asyncHandler(async (req, res) => {
-  const secret = String(req.headers["x-admin-secret"] ?? "");
-  if (secret !== TEMP_CLEANUP_SECRET) {
-    res.status(403).json({ message: "Forbidden" });
-    return;
-  }
-
-  // Children -> parents (FK-safe). Keep reference tables like `categories`.
-  const tablesInOrder = [
-    "negotiation_messages",
-    "messages",
-    "conversations",
-    "notifications",
-        "quotations",
-    "rfqs",
-    "orders",
-    "reviews",
-    "products",
-    "supplier_experts",
-    "supplier_documents",
-    "supplier_brands",
-    "projects",
-    "suppliers",
-    "users",
-  ] as const;
-
-  const client = await pool.connect();
-  const deleted: Array<{ table: string; deleted: number }> = [];
-
-  try {
-    await client.query("begin");
-
-    for (const table of tablesInOrder) {
-      // table name is from a hardcoded allowlist above.
-      const result = await client.query(`delete from "${table}"`);
-      deleted.push({ table, deleted: result.rowCount ?? 0 });
-    }
-
-    await client.query("commit");
-  } catch (err) {
-    await client.query("rollback");
-    throw err;
-  } finally {
-    client.release();
-  }
-
-  res.json({
-    success: true,
-    deleted,
-  });
-}));
 
 router.get("/admin/users", requireAuth, requireRole("admin"), asyncHandler(async (req, res) => {
   const { role, status, page = "1", limit = "20" } = req.query as any;
