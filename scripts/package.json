@@ -11,7 +11,8 @@
                     "seed:supplier-shop":  "tsx ./src/seed-supplier-shop.ts",
                     "update:supplier-shop-urls":  "tsx ./src/update-supplier-shop-urls.ts",
                     "typecheck":  "tsc -p tsconfig.json --noEmit",
-                    "cleanup:test-data":  "tsx ./src/cleanup-test-data.ts"
+                    "cleanup:test-data":  "tsx ./src/cleanup-test-data.ts",
+                    "admin:promote":  "tsx ./src/promote-admin.ts"
                 },
     "dependencies":  {
                          "@workspace/db":  "workspace:*",

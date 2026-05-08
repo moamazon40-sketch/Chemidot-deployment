@@ -7,7 +7,8 @@
                     "build":  "pnpm run typecheck \u0026\u0026 node scripts/push-db-if-configured.mjs \u0026\u0026 pnpm --filter @workspace/api-server run build \u0026\u0026 pnpm --filter @workspace/chemidot run build",
                     "typecheck:libs":  "tsc --build",
                     "typecheck":  "pnpm run typecheck:libs \u0026\u0026 pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck",
-                    "cleanup:test-data":  "pnpm --filter @workspace/scripts run cleanup:test-data"
+                    "cleanup:test-data":  "pnpm --filter @workspace/scripts run cleanup:test-data",
+                    "admin:promote":  "pnpm --filter @workspace/scripts run admin:promote"
                 },
     "private":  true,
     "devDependencies":  {
