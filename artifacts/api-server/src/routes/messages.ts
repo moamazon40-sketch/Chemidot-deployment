@@ -115,6 +115,14 @@ router.get("/messages/:conversationId", requireAuth, asyncHandler(async (req, re
     return;
   }
 
+  await db.update(messagesTable)
+    .set({ isRead: true })
+    .where(and(
+      eq(messagesTable.conversationId, conversationId),
+      eq(messagesTable.isRead, false),
+      ne(messagesTable.senderId, user.id),
+    ));
+
   const messages = await db.select().from(messagesTable)
     .leftJoin(usersTable, eq(usersTable.id, messagesTable.senderId))
     .where(eq(messagesTable.conversationId, conversationId))

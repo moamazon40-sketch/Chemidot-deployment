@@ -1,6 +1,6 @@
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/lib/auth";
-import { useListProducts, useDeleteProduct, useCreateProduct, useListCategories } from "@workspace/api-client-react";
+import { useListProducts, useDeleteProduct, useCreateProduct, useListCategories, useUpdateProduct } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import * as XLSX from "xlsx";
 
 const APPERANCE_OPTIONS = ["Solid", "Liquid", "Powder", "Granules", "Paste", "Gas", "Flakes", "Pellets", "Crystals"];
@@ -73,9 +73,10 @@ function ProductFormDialog({
   open: boolean; onClose: () => void; onSaved: () => void; initial?: any;
 }) {
   const createProduct = useCreateProduct();
+  const updateProduct = useUpdateProduct();
   const { data: categories = [] } = useListCategories();
   const { toast } = useToast();
-  const [form, setForm] = useState<ProductFormData>(
+  const getInitialForm = useCallback((): ProductFormData => (
     initial ? {
       name: initial.name ?? "", description: initial.description ?? "", minimumPurity: "",
       minimumQuantity: String(initial.moq ?? ""), maximumQuantity: "", appearance: "", categoryId: String(initial.categoryId ?? ""), colors: "",
@@ -83,7 +84,8 @@ function ProductFormDialog({
       warehouses: "", deliveryLeadTime: initial.deliveryLeadTime ?? "2-4 weeks", countryOfOrigin: initial.countryOfOrigin ?? "Saudi Arabia",
       basePrice: initial.basePrice ? String(initial.basePrice) : "", availability: initial.availability ?? "in_stock",
     } : defaultForm
-  );
+  ), [initial]);
+  const [form, setForm] = useState<ProductFormData>(getInitialForm);
   const [selectedCountries, setSelectedCountries] = useState<string[]>(["Saudi Arabia"]);
   const [selectedIndustries, setSelectedIndustries] = useState<string[]>([]);
   const [selectedWarehouses, setSelectedWarehouses] = useState<string[]>([]);
@@ -93,6 +95,10 @@ function ProductFormDialog({
   const docInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const bulkInputRef = useRef<HTMLInputElement | null>(null);
   const [dragOver, setDragOver] = useState(false);
+
+  useEffect(() => {
+    setForm(getInitialForm());
+  }, [getInitialForm, open]);
 
   const handleDocSelect = (docName: string, file: File | null) => {
     setDocFiles(prev => ({ ...prev, [docName]: file ?? null }));
@@ -135,27 +141,29 @@ function ProductFormDialog({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    createProduct.mutate({
-      data: {
-        name: form.name,
-        description: form.description,
-        casNumber: form.substances || undefined,
-        categoryId: parseInt(form.categoryId, 10),
-        moq: parseFloat(form.minimumQuantity || "1"),
-        moqUnit: form.units || "kg",
-        basePrice: form.basePrice ? parseFloat(form.basePrice) : undefined,
-        currency: "USD",
-        availability: form.availability,
-        deliveryLeadTime: form.deliveryLeadTime,
-        collectiveEligible: false,
-        countryOfOrigin: form.countryOfOrigin,
-        packaging: form.packaging || undefined,
-        pricingTiers: [],
-        images: [], applications: [], technicalSpecs: [],
-      }
-    }, {
+    const createPayload = {
+      name: form.name,
+      description: form.description,
+      casNumber: form.substances || undefined,
+      categoryId: parseInt(form.categoryId, 10),
+      moq: parseFloat(form.minimumQuantity || "1"),
+      moqUnit: form.units || "kg",
+      basePrice: form.basePrice ? parseFloat(form.basePrice) : undefined,
+      currency: "USD",
+      availability: form.availability,
+      deliveryLeadTime: form.deliveryLeadTime,
+      collectiveEligible: false,
+      countryOfOrigin: form.countryOfOrigin,
+      packaging: form.packaging || undefined,
+      pricingTiers: [],
+      images: [],
+      applications: [],
+      technicalSpecs: [],
+    };
+
+    const handlers = {
       onSuccess: () => {
-        toast({ title: "Product created successfully" });
+        toast({ title: initial?.id ? "Product updated successfully" : "Product created successfully" });
         onSaved();
         onClose();
       },
@@ -164,7 +172,25 @@ function ProductFormDialog({
         description: error?.response?.data?.message ?? "Please check the required product fields.",
         variant: "destructive",
       }),
-    });
+    };
+
+    if (initial?.id) {
+      updateProduct.mutate({
+        id: initial.id,
+        data: {
+          name: form.name,
+          description: form.description,
+          moq: parseFloat(form.minimumQuantity || "1"),
+          basePrice: form.basePrice ? parseFloat(form.basePrice) : undefined,
+          availability: form.availability,
+          deliveryLeadTime: form.deliveryLeadTime,
+          collectiveEligible: false,
+        }
+      }, handlers);
+      return;
+    }
+
+    createProduct.mutate({ data: createPayload }, handlers);
   };
 
   return (
@@ -446,8 +472,42 @@ export default function SupplierProducts() {
   const { toast } = useToast();
   const [formOpen, setFormOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
+  const [supplierId, setSupplierId] = useState<number | null>(null);
+  const [loadingSupplierId, setLoadingSupplierId] = useState(false);
 
-  const { data, isLoading, refetch } = useListProducts({ supplierId: user?.id, limit: 50 });
+  useEffect(() => {
+    if (user?.role !== "supplier") return;
+    let cancelled = false;
+
+    const loadSupplierProfile = async () => {
+      setLoadingSupplierId(true);
+      try {
+        const res = await fetch("/api/suppliers/profile", {
+          headers: { Authorization: `Bearer ${localStorage.getItem("chemidot_token") ?? ""}` },
+        });
+        if (!res.ok) throw new Error("Failed to load supplier profile");
+        const profile = await res.json();
+        if (!cancelled) setSupplierId(profile.id ?? null);
+      } catch {
+        if (!cancelled) {
+          setSupplierId(null);
+          toast({ title: "Could not load supplier catalog", variant: "destructive" });
+        }
+      } finally {
+        if (!cancelled) setLoadingSupplierId(false);
+      }
+    };
+
+    void loadSupplierProfile();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.role, toast]);
+
+  const { data, isLoading, refetch } = useListProducts(
+    supplierId ? { supplierId, limit: 50 } : undefined,
+    { query: { enabled: !!supplierId } as any },
+  );
   const deleteMutation = useDeleteProduct();
 
   const handleDelete = (id: number) => {
@@ -482,7 +542,7 @@ export default function SupplierProducts() {
 
         <Card className="border-orange-500/10 shadow-sm">
           <CardContent className="p-0">
-            {isLoading ? (
+            {isLoading || loadingSupplierId ? (
               <div className="p-6 space-y-4">
                 {[1, 2, 3].map(i => <Skeleton key={i} className="h-20 w-full" />)}
               </div>

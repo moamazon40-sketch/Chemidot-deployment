@@ -2,10 +2,10 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import {
   rfqsTable, ordersTable, collectiveOrderParticipantsTable,
-  productsTable, suppliersTable, usersTable, messagesTable,
+  productsTable, suppliersTable, usersTable, messagesTable, conversationsTable,
   collectiveOrdersTable, notificationsTable, quotationsTable
 } from "@workspace/db";
-import { eq, and, sql, desc, gte } from "drizzle-orm";
+import { eq, and, sql, desc, gte, inArray, or, ilike, ne } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/auth";
 import { asyncHandler } from "../middlewares/asyncHandler";
 
@@ -21,6 +21,57 @@ function getLast6Months(): { month: string; year: number; monthNum: number }[] {
     result.push({ month: MONTH_NAMES[d.getMonth()], year: d.getFullYear(), monthNum: d.getMonth() });
   }
   return result;
+}
+
+async function getSupplierActiveRfqCount(supplier: typeof suppliersTable.$inferSelect | undefined) {
+  if (!supplier) return 0;
+
+  const supplierProducts = await db.select({
+    name: productsTable.name,
+    casNumber: productsTable.casNumber,
+    categoryId: productsTable.categoryId,
+  }).from(productsTable).where(eq(productsTable.supplierId, supplier.id));
+
+  if (supplierProducts.length === 0) return 0;
+
+  const matchConditions: any[] = [];
+  const categoryIds = [...new Set(supplierProducts.map((product) => product.categoryId).filter(Boolean))];
+
+  if (categoryIds.length > 0) {
+    matchConditions.push(inArray(rfqsTable.categoryId, categoryIds as number[]));
+  }
+
+  if (supplier.country) {
+    matchConditions.push(eq(rfqsTable.deliveryDestination, supplier.country));
+  }
+
+  for (const product of supplierProducts) {
+    if (product.name) {
+      const escapedName = product.name.replace(/[%_\\]/g, "\\$&");
+      matchConditions.push(ilike(rfqsTable.productName, `%${escapedName}%`));
+    }
+    if (product.casNumber) {
+      matchConditions.push(eq(rfqsTable.casNumber, product.casNumber));
+    }
+  }
+
+  if (matchConditions.length === 0) return 0;
+
+  const productMatchConditions = matchConditions.filter((condition) =>
+    condition.toString().includes("productName") || condition.toString().includes("casNumber")
+  );
+  const allConditions = [
+    eq(rfqsTable.status, "active"),
+    categoryIds.length > 0 ? inArray(rfqsTable.categoryId, categoryIds as number[]) : undefined,
+    supplier.country ? eq(rfqsTable.deliveryDestination, supplier.country) : undefined,
+    productMatchConditions.length > 0 ? or(...productMatchConditions) : undefined,
+  ].filter(Boolean) as any[];
+
+  const [result] = await db.select({ count: sql<number>`cast(count(*) as int)` })
+    .from(rfqsTable)
+    .where(and(...allConditions));
+
+  return result?.count ?? 0;
 }
 
 router.get("/dashboard/buyer-stats", requireAuth, asyncHandler(async (req, res) => {
@@ -127,8 +178,16 @@ router.get("/dashboard/supplier-stats", requireAuth, requireRole("supplier", "ad
     ? (await db.select({ count: sql<number>`cast(count(*) as int)` }).from(ordersTable).where(and(eq(ordersTable.supplierId, supplier.id), eq(ordersTable.status, "pending"))))[0]?.count ?? 0
     : 0;
 
-  const activeRfqs = supplier
-    ? (await db.select({ count: sql<number>`cast(count(*) as int)` }).from(rfqsTable).where(eq(rfqsTable.status, "active")))[0]?.count ?? 0
+  const activeRfqs = await getSupplierActiveRfqCount(supplier);
+  const unreadMessages = supplier
+    ? (await db.select({ count: sql<number>`cast(count(*) as int)` })
+      .from(messagesTable)
+      .leftJoin(conversationsTable, eq(conversationsTable.id, messagesTable.conversationId))
+      .where(and(
+        eq(messagesTable.isRead, false),
+        ne(messagesTable.senderId, user.id),
+        eq(conversationsTable.supplierId, user.id),
+      )))[0]?.count ?? 0
     : 0;
 
   const recentActivity: { description: string; createdAt: string }[] = [];
@@ -170,12 +229,13 @@ router.get("/dashboard/supplier-stats", requireAuth, requireRole("supplier", "ad
   }
 
   const months = getLast6Months();
-  let revenueByMonth: { month: string; value: number }[] = [];
+  let revenueByMonth: { month: string; value: number; orders: number }[] = [];
   if (supplier) {
     const revenueRows = await db.select({
       month: sql<number>`extract(month from ${ordersTable.createdAt})`,
       year: sql<number>`extract(year from ${ordersTable.createdAt})`,
       total: sql<number>`cast(coalesce(sum(total_price), 0) as float)`,
+      orders: sql<number>`cast(count(*) as int)`,
     }).from(ordersTable)
       .where(and(
         eq(ordersTable.supplierId, supplier.id),
@@ -185,9 +245,15 @@ router.get("/dashboard/supplier-stats", requireAuth, requireRole("supplier", "ad
 
     revenueByMonth = months.map(m => {
       const row = revenueRows.find(r => Number(r.month) === m.monthNum + 1 && Number(r.year) === m.year);
-      return { month: m.month, value: row ? Number(row.total) : 0 };
+      return {
+        month: m.month,
+        value: row ? Number(row.total) : 0,
+        orders: row ? Number(row.orders) : 0,
+      };
     });
   }
+
+  const currentMonthRevenue = revenueByMonth.at(-1)?.value ?? 0;
 
   res.json({
     totalProducts: productCount,
@@ -195,10 +261,10 @@ router.get("/dashboard/supplier-stats", requireAuth, requireRole("supplier", "ad
     totalOrders: orderCount,
     pendingOrders,
     totalRevenue: revenue,
-    monthlyRevenue: 0,
+    monthlyRevenue: currentMonthRevenue,
     responseRate: parseFloat(supplier?.responseRate ?? "0"),
     avgResponseTime: supplier?.avgResponseTime ?? "N/A",
-    unreadMessages: 0,
+    unreadMessages,
     recentActivity: recentActivity.slice(0, 6),
     revenueByMonth,
     topProducts: topProducts.map(r => ({

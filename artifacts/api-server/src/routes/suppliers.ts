@@ -1,6 +1,14 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { suppliersTable, usersTable, productsTable, categoriesTable } from "@workspace/db";
+import {
+  suppliersTable,
+  usersTable,
+  productsTable,
+  categoriesTable,
+  supplierBrandsTable,
+  supplierDocumentsTable,
+  supplierExpertsTable,
+} from "@workspace/db";
 import { eq, ilike, and, sql, desc } from "drizzle-orm";
 import { optionalAuth, requireAuth } from "../middlewares/auth";
 import { asyncHandler } from "../middlewares/asyncHandler";
@@ -68,6 +76,80 @@ function sanitizeSearch(input: string): string {
   return input.replace(/[%_\\]/g, (ch) => `\\${ch}`);
 }
 
+async function getSupplierProfileByUserId(userId: number) {
+  const [supplier] = await db.select().from(suppliersTable).where(eq(suppliersTable.userId, userId)).limit(1);
+  if (!supplier) return null;
+
+  const [brands, documents, experts, products] = await Promise.all([
+    db.select().from(supplierBrandsTable).where(eq(supplierBrandsTable.supplierId, supplier.id)),
+    db.select().from(supplierDocumentsTable).where(eq(supplierDocumentsTable.supplierId, supplier.id)),
+    db.select().from(supplierExpertsTable).where(eq(supplierExpertsTable.supplierId, supplier.id)),
+    db.select().from(productsTable)
+      .leftJoin(categoriesTable, eq(categoriesTable.id, productsTable.categoryId))
+      .where(eq(productsTable.supplierId, supplier.id))
+      .orderBy(desc(productsTable.createdAt))
+      .limit(50),
+  ]);
+
+  return {
+    ...buildSupplier(supplier),
+    id: supplier.id,
+    userId: supplier.userId,
+    description: supplier.description,
+    warehouseLocation: supplier.warehouseLocation,
+    commercialRegNumber: supplier.commercialRegNumber,
+    brands: brands.map((brand) => ({
+      id: brand.id,
+      supplierId: brand.supplierId,
+      name: brand.name,
+      logoUrl: brand.logoUrl,
+      description: brand.description,
+      createdAt: brand.createdAt instanceof Date ? brand.createdAt.toISOString() : String(brand.createdAt),
+    })),
+    documents: documents.map((document) => ({
+      id: document.id,
+      supplierId: document.supplierId,
+      title: document.title,
+      type: document.type,
+      fileUrl: document.fileUrl,
+      fileSize: document.fileSize,
+      createdAt: document.createdAt instanceof Date ? document.createdAt.toISOString() : String(document.createdAt),
+    })),
+    experts: experts.map((expert) => ({
+      id: expert.id,
+      supplierId: expert.supplierId,
+      name: expert.name,
+      title: expert.title,
+      email: expert.email,
+      avatarUrl: expert.avatarUrl,
+      createdAt: expert.createdAt instanceof Date ? expert.createdAt.toISOString() : String(expert.createdAt),
+    })),
+    products: products.map((r) => ({
+      id: r.products.id,
+      name: r.products.name,
+      casNumber: r.products.casNumber,
+      description: r.products.description,
+      categoryId: r.products.categoryId,
+      categoryName: r.categories?.name ?? "",
+      supplierId: supplier.id,
+      supplierName: supplier.companyName,
+      supplierVerified: supplier.verified,
+      supplierCountry: supplier.country,
+      imageUrl: r.products.imageUrl,
+      moq: parseFloat(r.products.moq),
+      moqUnit: r.products.moqUnit,
+      basePrice: r.products.basePrice ? parseFloat(r.products.basePrice) : null,
+      currency: r.products.currency,
+      availability: r.products.availability,
+      deliveryLeadTime: r.products.deliveryLeadTime,
+      collectiveEligible: r.products.collectiveEligible,
+      rating: null,
+      reviewCount: 0,
+      createdAt: r.products.createdAt.toISOString(),
+    })),
+  };
+}
+
 router.get("/suppliers/featured", asyncHandler(async (_req, res) => {
   const suppliers = await db.select().from(suppliersTable)
     .where(eq(suppliersTable.featured, true))
@@ -101,6 +183,16 @@ router.get("/suppliers", optionalAuth, asyncHandler(async (req, res) => {
     limit: limitNum,
     totalPages: Math.ceil(total / limitNum),
   });
+}));
+
+router.get("/suppliers/profile", requireAuth, asyncHandler(async (req: any, res) => {
+  const profile = await getSupplierProfileByUserId(req.user.id);
+  if (!profile) {
+    res.status(404).json({ message: "Supplier profile not found" });
+    return;
+  }
+
+  res.json(profile);
 }));
 
 router.get("/suppliers/:id", asyncHandler(async (req, res) => {
@@ -164,11 +256,28 @@ router.patch("/suppliers/profile", requireAuth, asyncHandler(async (req: any, re
     return;
   }
 
-  const { description, logoUrl, coverUrl, companyName } = req.body as {
+  const {
+    description,
+    logoUrl,
+    coverUrl,
+    companyName,
+    country,
+    warehouseLocation,
+    commercialRegNumber,
+    certifications,
+    yearsInBusiness,
+    avgResponseTime,
+  } = req.body as {
     description?: string;
     logoUrl?: string;
     coverUrl?: string;
     companyName?: string;
+    country?: string;
+    warehouseLocation?: string;
+    commercialRegNumber?: string;
+    certifications?: string[];
+    yearsInBusiness?: number;
+    avgResponseTime?: string;
   };
 
   const update: Record<string, any> = {};
@@ -176,11 +285,25 @@ router.patch("/suppliers/profile", requireAuth, asyncHandler(async (req: any, re
   if (logoUrl !== undefined) update.logoUrl = logoUrl;
   if (coverUrl !== undefined) update.coverUrl = coverUrl;
   if (companyName !== undefined) update.companyName = companyName;
+  if (country !== undefined) update.country = country;
+  if (warehouseLocation !== undefined) update.warehouseLocation = warehouseLocation;
+  if (commercialRegNumber !== undefined) update.commercialRegNumber = commercialRegNumber;
+  if (certifications !== undefined) update.certifications = certifications.filter(Boolean);
+  if (yearsInBusiness !== undefined) update.yearsInBusiness = yearsInBusiness;
+  if (avgResponseTime !== undefined) update.avgResponseTime = avgResponseTime;
 
   const [updated] = await db.update(suppliersTable)
     .set({ ...update, updatedAt: new Date() })
     .where(eq(suppliersTable.id, supplier.id))
     .returning();
+
+  const userUpdates: Record<string, any> = {};
+  if (companyName !== undefined) userUpdates.companyName = companyName;
+  if (country !== undefined) userUpdates.country = country;
+  if (Object.keys(userUpdates).length > 0) {
+    userUpdates.updatedAt = new Date();
+    await db.update(usersTable).set(userUpdates).where(eq(usersTable.id, userId));
+  }
 
   res.json({ success: true, supplier: buildSupplier(updated) });
 }));

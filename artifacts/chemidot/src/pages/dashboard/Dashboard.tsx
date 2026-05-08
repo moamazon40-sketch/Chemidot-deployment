@@ -403,7 +403,7 @@ function BuyerDashboard() {
 ══════════════════════════════════════════════════════ */
 function SupplierDashboard() {
   const { data: stats, isLoading } = useGetSupplierStats();
-  const [editProfileOpen, setEditProfileOpen] = useState(false);
+  const [, navigate] = useLocation();
 
   if (isLoading) return <DashboardSkeleton />;
   if (!stats) return null;
@@ -425,14 +425,12 @@ function SupplierDashboard() {
       <div className="flex items-center justify-between rounded-xl border bg-muted/30 px-5 py-4">
         <div>
           <p className="font-semibold text-sm">Company Profile</p>
-          <p className="text-xs text-muted-foreground mt-0.5">Update your storefront, description, logo, and cover image.</p>
+          <p className="text-xs text-muted-foreground mt-0.5">Manage your storefront, documents, brands, and optional expert profiles from one place.</p>
         </div>
-        <Button variant="outline" size="sm" className="gap-2 shrink-0" onClick={() => setEditProfileOpen(true)}>
-          <Pencil className="w-3.5 h-3.5" /> Edit Company Profile
+        <Button variant="outline" size="sm" className="gap-2 shrink-0" onClick={() => navigate("/dashboard/settings")}>
+          <Pencil className="w-3.5 h-3.5" /> Open Settings
         </Button>
       </div>
-
-      <EditCompanyProfileDialog open={editProfileOpen} onClose={() => setEditProfileOpen(false)} />
 
       {/* KPI row */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

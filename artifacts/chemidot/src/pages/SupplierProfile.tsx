@@ -17,7 +17,7 @@ import {
   Package, Layers, FileText, Users, Store, ExternalLink, Tag
 } from "lucide-react";
 import { ProductCard } from "@/components/ProductCard";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -177,14 +177,52 @@ export default function SupplierProfile() {
   const id = Number(params?.id);
   const [activeTab, setActiveTab] = useState<Tab>("storefront");
   const [sidebarSearch, setSidebarSearch] = useState("");
+  const [brands, setBrands] = useState<any[]>([]);
+  const [documents, setDocuments] = useState<any[]>([]);
+  const [experts, setExperts] = useState<any[]>([]);
   const { toast } = useToast();
 
   const { data: supplier, isLoading } = useGetSupplier(id);
-  const brands: any[] = [];
-  const documents: any[] = [];
-  const experts: any[] = [];
 
   const profile = supplier as SupplierProfileType | undefined;
+
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+
+    const loadStoreSections = async () => {
+      try {
+        const [brandsRes, documentsRes, expertsRes] = await Promise.all([
+          fetch(`/api/suppliers/${id}/brands`),
+          fetch(`/api/suppliers/${id}/documents`),
+          fetch(`/api/suppliers/${id}/experts`),
+        ]);
+
+        const [brandsData, documentsData, expertsData] = await Promise.all([
+          brandsRes.ok ? brandsRes.json() : [],
+          documentsRes.ok ? documentsRes.json() : [],
+          expertsRes.ok ? expertsRes.json() : [],
+        ]);
+
+        if (!cancelled) {
+          setBrands(Array.isArray(brandsData) ? brandsData : []);
+          setDocuments(Array.isArray(documentsData) ? documentsData : []);
+          setExperts(Array.isArray(expertsData) ? expertsData : []);
+        }
+      } catch {
+        if (!cancelled) {
+          setBrands([]);
+          setDocuments([]);
+          setExperts([]);
+        }
+      }
+    };
+
+    loadStoreSections();
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
 
   const handleShare = () => {
     navigator.clipboard.writeText(window.location.href);
@@ -194,10 +232,16 @@ export default function SupplierProfile() {
   const tabs: { key: Tab; label: string; icon: React.ElementType; count?: number }[] = [
     { key: "storefront", label: "Storefront", icon: Store },
     { key: "products", label: "Products", icon: Package, count: profile?.products?.length ?? supplier?.productCount ?? 0 },
-    { key: "brands", label: "Brands", icon: Tag, count: brands?.length ?? 0 },
-    { key: "documents", label: "Documents", icon: FileText, count: documents?.length ?? 0 },
-    { key: "experts", label: "Experts", icon: Users, count: experts?.length ?? 0 },
+    ...(brands.length > 0 ? [{ key: "brands" as Tab, label: "Brands", icon: Tag, count: brands.length }] : []),
+    ...(documents.length > 0 ? [{ key: "documents" as Tab, label: "Documents", icon: FileText, count: documents.length }] : []),
+    ...(experts.length > 0 ? [{ key: "experts" as Tab, label: "Experts", icon: Users, count: experts.length }] : []),
   ];
+
+  useEffect(() => {
+    if (!tabs.some((tab) => tab.key === activeTab)) {
+      setActiveTab("storefront");
+    }
+  }, [activeTab, tabs]);
 
   if (isLoading) {
     return (
@@ -230,8 +274,15 @@ export default function SupplierProfile() {
     );
   }
 
-  const TECHNOLOGIES = ["Polyurethane Chemistry", "Epoxy Systems", "Acrylic Polymers", "Surfactant Chemistry", "Specialty Coatings", "Reactive Silicones", "Bio-based Materials", "Water Treatment Chemicals"];
-  const MARKETS = ["Construction", "Automotive", "Pharma & Life Science", "Paints & Coatings", "Water Treatment", "Food & Feed", "Oil & Energy", "Agriculture"];
+  const categoryTags = useMemo(() => {
+    const tags = new Set<string>();
+    for (const product of profile?.products ?? []) {
+      if ((product as any).categoryName) tags.add((product as any).categoryName);
+    }
+    return Array.from(tags).slice(0, 8);
+  }, [profile?.products]);
+
+  const certificationTags = useMemo(() => (supplier.certifications ?? []).filter(Boolean).slice(0, 8), [supplier.certifications]);
 
   return (
     <MainLayout>
@@ -311,12 +362,22 @@ export default function SupplierProfile() {
             </div>
 
             {/* Collapsible sections */}
-            <CollapsibleSection title="Browse by Technologies" tags={TECHNOLOGIES} />
-            <CollapsibleSection title="Browse by Markets" tags={MARKETS} />
+            {categoryTags.length > 0 && (
+              <CollapsibleSection title="Browse Categories" tags={categoryTags} />
+            )}
+            {certificationTags.length > 0 && (
+              <CollapsibleSection title="Credentials" tags={certificationTags} />
+            )}
 
             {/* Quick Actions */}
             <div className="space-y-2 border-t pt-4">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Quick Actions</p>
+              <Link href="/rfq">
+                <Button size="sm" className="w-full gap-2 justify-start text-sm">
+                  <Mail className="w-3.5 h-3.5" /> Request Quote
+                </Button>
+              </Link>
+              <MessageSupplierDialog supplierId={supplier.id} companyName={supplier.companyName} />
               <ActionModal
                 title="Request Sample"
                 description="I'd like to request a product sample from your catalog."
@@ -326,15 +387,17 @@ export default function SupplierProfile() {
                   </Button>
                 }
               />
-              <ActionModal
-                title="Request Document"
-                description="Please provide TDS/SDS documentation for your products."
-                trigger={
-                  <Button variant="outline" size="sm" className="w-full gap-2 justify-start text-sm">
-                    <FileText className="w-3.5 h-3.5" /> Request Document
-                  </Button>
-                }
-              />
+              {documents.length > 0 && (
+                <ActionModal
+                  title="Request Document"
+                  description="Please provide TDS/SDS documentation for your products."
+                  trigger={
+                    <Button variant="outline" size="sm" className="w-full gap-2 justify-start text-sm">
+                      <FileText className="w-3.5 h-3.5" /> Request Document
+                    </Button>
+                  }
+                />
+              )}
             </div>
           </div>
         </aside>
@@ -385,6 +448,11 @@ export default function SupplierProfile() {
                 </div>
               </div>
               <div className="flex items-center gap-2 pb-2">
+                <Link href="/rfq">
+                  <Button className="gap-2 shadow-sm">
+                    <Mail className="w-4 h-4" /> Request Quote
+                  </Button>
+                </Link>
                 <Button variant="outline" size="sm" className="gap-2" onClick={handleShare}>
                   <Share2 className="w-3.5 h-3.5" /> Share
                 </Button>
@@ -467,16 +535,12 @@ export default function SupplierProfile() {
 
                 {/* 4 CTA buttons */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-4 border-t">
-                  <ActionModal
-                    title="Request Document"
-                    description="Please provide TDS/SDS documentation for your products."
-                    trigger={
-                      <Button variant="outline" className="w-full gap-2 flex-col h-auto py-4 text-xs">
-                        <FileText className="w-5 h-5" />
-                        <span>Request Document</span>
-                      </Button>
-                    }
-                  />
+                  <Link href="/rfq">
+                    <Button className="w-full gap-2 flex-col h-auto py-4 text-xs">
+                      <Mail className="w-5 h-5" />
+                      <span>Request Quote</span>
+                    </Button>
+                  </Link>
                   <ActionModal
                     title="Request Sample"
                     description="I'd like to request a product sample from your catalog."
@@ -497,16 +561,29 @@ export default function SupplierProfile() {
                       </Button>
                     }
                   />
-                  <ActionModal
-                    title="Ask an Expert"
-                    description="I'd like to speak with a technical expert from your team."
-                    trigger={
-                      <Button variant="outline" className="w-full gap-2 flex-col h-auto py-4 text-xs">
-                        <User className="w-5 h-5" />
-                        <span>Ask an Expert</span>
-                      </Button>
-                    }
-                  />
+                  {experts.length > 0 ? (
+                    <ActionModal
+                      title="Ask an Expert"
+                      description="I'd like to speak with a technical expert from your team."
+                      trigger={
+                        <Button variant="outline" className="w-full gap-2 flex-col h-auto py-4 text-xs">
+                          <User className="w-5 h-5" />
+                          <span>Ask an Expert</span>
+                        </Button>
+                      }
+                    />
+                  ) : documents.length > 0 ? (
+                    <ActionModal
+                      title="Request Document"
+                      description="Please provide TDS/SDS documentation for your products."
+                      trigger={
+                        <Button variant="outline" className="w-full gap-2 flex-col h-auto py-4 text-xs">
+                          <FileText className="w-5 h-5" />
+                          <span>Request Document</span>
+                        </Button>
+                      }
+                    />
+                  ) : null}
                 </div>
               </div>
             )}
