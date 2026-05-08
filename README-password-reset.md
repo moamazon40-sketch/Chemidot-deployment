@@ -49,3 +49,4 @@ The script provides detailed feedback:
 - Use strong, unique passwords
 - This script should only be used for legitimate password reset operations
 - Consider implementing a proper password reset flow for production applications
+- trigger redeploy
