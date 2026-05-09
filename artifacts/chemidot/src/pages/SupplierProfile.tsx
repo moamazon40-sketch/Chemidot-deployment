@@ -186,6 +186,20 @@ export default function SupplierProfile() {
 
   const profile = supplier as SupplierProfileType | undefined;
 
+  // Hooks must run unconditionally on every render (even when loading).
+  const categoryTags = useMemo(() => {
+    const tags = new Set<string>();
+    for (const product of profile?.products ?? []) {
+      if ((product as any).categoryName) tags.add((product as any).categoryName);
+    }
+    return Array.from(tags).slice(0, 8);
+  }, [profile?.products]);
+
+  const certificationTags = useMemo(
+    () => (supplier?.certifications ?? []).filter(Boolean).slice(0, 8),
+    [supplier?.certifications]
+  );
+
   useEffect(() => {
     if (!id) return;
     let cancelled = false;
@@ -273,16 +287,6 @@ export default function SupplierProfile() {
       </MainLayout>
     );
   }
-
-  const categoryTags = useMemo(() => {
-    const tags = new Set<string>();
-    for (const product of profile?.products ?? []) {
-      if ((product as any).categoryName) tags.add((product as any).categoryName);
-    }
-    return Array.from(tags).slice(0, 8);
-  }, [profile?.products]);
-
-  const certificationTags = useMemo(() => (supplier.certifications ?? []).filter(Boolean).slice(0, 8), [supplier.certifications]);
 
   return (
     <MainLayout>
