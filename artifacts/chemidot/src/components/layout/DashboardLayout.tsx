@@ -262,10 +262,38 @@ function TopNav() {
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const { t } = useLanguage();
-  const { data: notifs } = useListNotifications({ unreadOnly: true });
+  const { data: notifs } = useListNotifications(
+    { unreadOnly: true },
+    { query: { enabled: !!user } as any }
+  );
   const unreadCount = notifs?.length ?? 0;
 
-  if (!user) return null;
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center px-6">
+        <div className="w-full max-w-md text-center space-y-4">
+          <Link href="/" className="inline-flex items-center justify-center gap-2 font-bold text-lg">
+            <img src={logoImage} alt="Chemidot" className="h-9 w-9 object-contain" />
+            Chemidot
+          </Link>
+          <div className="rounded-lg border bg-card p-6 shadow-sm space-y-3">
+            <h1 className="text-xl font-semibold">Login required</h1>
+            <p className="text-sm text-muted-foreground">
+              Please log in with an authorized account to open this page.
+            </p>
+            <div className="flex justify-center gap-2 pt-2">
+              <Button asChild>
+                <Link href="/auth/login">Log in</Link>
+              </Button>
+              <Button variant="outline" asChild>
+                <Link href="/">Go home</Link>
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const groups = buildNavGroups(user.role, t, unreadCount);
 
