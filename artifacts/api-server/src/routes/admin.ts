@@ -271,7 +271,7 @@ router.post("/admin/categories", requireAuth, requireRole("admin"), asyncHandler
 
 router.patch("/admin/categories/:id", requireAuth, requireRole("admin"), asyncHandler(async (req, res) => {
   const id = parseInt(String(req.params.id));
-  const updates: Record<string, any> = { updatedAt: new Date() };
+  const updates: Record<string, any> = {};
   for (const key of ["name", "nameAr", "slug", "iconUrl"] as const) {
     if ((req.body as any)[key] !== undefined) updates[key] = (req.body as any)[key];
   }
