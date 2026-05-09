@@ -5,21 +5,23 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Package, MoreVertical, Edit, Trash2, Upload, FileText, Download, ArrowLeft, Boxes, ClipboardList } from "lucide-react";
+import { Plus, Package, MoreVertical, Edit, Trash2, Upload, Download, ArrowLeft, Boxes } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 
 const APPERANCE_OPTIONS = ["Solid", "Liquid", "Powder", "Granules", "Paste", "Gas", "Flakes", "Pellets", "Crystals"];
-const CATEGORY_OPTIONS = ["Industrial Chemicals", "Construction Chemicals", "Solvents", "Polymers", "Fine Chemicals", "Additives", "Surfactants", "Agrochemicals", "Specialty Chemicals", "Pharmaceuticals"];
 const COLOR_OPTIONS = ["Clear / Colorless", "White", "Yellow", "Brown", "Black", "Blue", "Red", "Green", "Orange", "Pink", "Gray", "Amber"];
 const INCOTERM_OPTIONS = ["EXW", "FCA", "CPT", "CIP", "DAP", "DPU", "DDP", "FAS", "FOB", "CFR", "CIF"];
 const INDUSTRY_OPTIONS = [
@@ -34,7 +36,8 @@ const PACKAGING_OPTIONS = ["Drum", "IBC", "Bag", "Bottle", "Pail", "Tanker", "Fl
 const UNIT_OPTIONS = ["kg", "L", "MT", "g", "mL", "T", "lb", "oz", "drum", "IBC"];
 const SUBSTANCE_OPTIONS = ["Organic", "Inorganic", "Polymer", "Surfactant", "Solvent", "Acid", "Base", "Salt", "Ester", "Amine", "Ether", "Ketone", "Aldehyde", "Aromatic"];
 const WAREHOUSE_OPTIONS = ["Riyadh", "Jeddah", "Dammam", "Dubai", "Abu Dhabi", "Kuwait City", "Doha", "Muscat", "Riyadh Central Warehouse", "Jeddah Free Zone", "Dammam Storage", "Dubai Hub"];
-const DOCUMENTS = ["Safety Data Sheet", "Technical Data Sheet", "Additional Document"];
+const COUNTRY_MULTI_OPTIONS = ["Saudi Arabia", "UAE", "Kuwait", "Qatar", "Bahrain", "Oman", "Egypt", "Jordan", "Iraq", "Turkey", "India", "China", "Germany", "United States"];
+const DOCUMENTS = ["Safety Data Sheet (SDS)", "Technical Data Sheet (TDS)", "Certificate of Analysis (COA)"];
 
 const TEMPLATE_HEADERS = [
   "Name", "Description", "Minimum Purity", "Minimum Quantity", "Maximum Quantity", "Appearance",
@@ -42,42 +45,115 @@ const TEMPLATE_HEADERS = [
   "Substances", "Warehouses",
 ];
 
-const COUNTRY_MULTI_OPTIONS = ["Saudi Arabia", "UAE", "Kuwait", "Qatar", "Bahrain", "Oman", "Egypt", "Jordan", "Iraq", "Turkey", "India", "China", "Germany", "United States"];
-
 interface ProductFormData {
-  name: string; description: string; minimumPurity: string; minimumQuantity: string; maximumQuantity: string;
-  appearance: string; categoryIds: string[]; colors: string; deliverCountries: string; incoterms: string[];
-  industries: string; packaging: string; units: string; substances: string; warehouses: string;
-  deliveryLeadTime: string; countryOfOrigin: string; basePrice: string; availability: "in_stock" | "limited" | "out_of_stock";
+  name: string;
+  description: string;
+  minimumPurity: string;
+  minimumQuantity: string;
+  maximumQuantity: string;
+  appearance: string;
+  categoryIds: string[];
+  colors: string;
+  incoterms: string[];
+  industries: string;
+  packaging: string;
+  units: string;
+  substances: string;
+  warehouses: string;
+  deliveryLeadTime: string;
+  countryOfOrigin: string;
+  basePrice: string;
+  availability: "in_stock" | "limited" | "out_of_stock";
   technicalSpecsRaw: string;
 }
 
 const defaultForm: ProductFormData = {
-  name: "", description: "", minimumPurity: "", minimumQuantity: "", maximumQuantity: "",
-  appearance: "", categoryIds: [], colors: "", deliverCountries: "", incoterms: [],
-  industries: "", packaging: "", units: "", substances: "", warehouses: "",
-  deliveryLeadTime: "2-4 weeks", countryOfOrigin: "Saudi Arabia", basePrice: "", availability: "in_stock",
+  name: "",
+  description: "",
+  minimumPurity: "",
+  minimumQuantity: "",
+  maximumQuantity: "",
+  appearance: "",
+  categoryIds: [],
+  colors: "",
+  incoterms: [],
+  industries: "",
+  packaging: "",
+  units: "",
+  substances: "",
+  warehouses: "",
+  deliveryLeadTime: "2-4 weeks",
+  countryOfOrigin: "Saudi Arabia",
+  basePrice: "",
+  availability: "in_stock",
   technicalSpecsRaw: "",
 };
 
-const PRODUCT_TEMPLATES = [
-  "Solvent / Diluent",
-  "Resin / Binder",
-  "Additive / Modifier",
-  "Surfactant / Wetting Agent",
-  "Industrial Intermediate",
-  "Specialty Chemical",
-];
+function SectionCard({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
+  return (
+    <Card className="shadow-none">
+      <CardHeader className="space-y-1 pb-3">
+        <div className="font-semibold">{title}</div>
+        {description && <p className="text-sm text-muted-foreground">{description}</p>}
+      </CardHeader>
+      <CardContent className="space-y-4">{children}</CardContent>
+    </Card>
+  );
+}
+
+function OptionGrid({
+  options,
+  selected,
+  onChange,
+  maxHeight = "max-h-44",
+}: {
+  options: string[];
+  selected: string[];
+  onChange: (next: string[]) => void;
+  maxHeight?: string;
+}) {
+  return (
+    <div className={`grid grid-cols-2 gap-2 overflow-y-auto rounded-md border bg-background p-3 sm:grid-cols-3 ${maxHeight}`}>
+      {options.map((option) => (
+        <label key={option} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground/80 hover:bg-muted">
+          <input
+            type="checkbox"
+            className="accent-primary"
+            checked={selected.includes(option)}
+            onChange={(e) => onChange(e.target.checked ? [...selected, option] : selected.filter((value) => value !== option))}
+          />
+          <span>{option}</span>
+        </label>
+      ))}
+    </div>
+  );
+}
 
 function ProductFormDialog({
-  open, onClose, onSaved, initial,
+  open,
+  onClose,
+  onSaved,
+  initial,
 }: {
-  open: boolean; onClose: () => void; onSaved: () => void; initial?: any;
+  open: boolean;
+  onClose: () => void;
+  onSaved: () => void;
+  initial?: any;
 }) {
   const createProduct = useCreateProduct();
   const updateProduct = useUpdateProduct();
   const { data: categories = [] } = useListCategories();
   const { toast } = useToast();
+  const docInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const bulkInputRef = useRef<HTMLInputElement | null>(null);
+  const [selectedCountries, setSelectedCountries] = useState<string[]>(["Saudi Arabia"]);
+  const [selectedIndustries, setSelectedIndustries] = useState<string[]>([]);
+  const [selectedWarehouses, setSelectedWarehouses] = useState<string[]>([]);
+  const [bulkRows, setBulkRows] = useState<Record<string, string>[]>([]);
+  const [bulkFileName, setBulkFileName] = useState("");
+  const [docFiles, setDocFiles] = useState<Record<string, File | null>>({});
+  const [dragOver, setDragOver] = useState(false);
+
   const getInitialForm = useCallback((): ProductFormData => {
     if (!initial) return defaultForm;
 
@@ -99,39 +175,48 @@ function ProductFormDialog({
     ];
 
     return {
-      name: initial.name ?? "", description: initial.description ?? "", minimumPurity: "",
-      minimumQuantity: String(initial.moq ?? ""), maximumQuantity: "", appearance: "", categoryIds: Array.from(new Set(categoryIds)), colors: "",
-      deliverCountries: "", incoterms, industries: "", packaging: initial.packaging ?? "", units: initial.moqUnit ?? "", substances: initial.casNumber ?? "",
-      warehouses: "", deliveryLeadTime: initial.deliveryLeadTime ?? "2-4 weeks", countryOfOrigin: initial.countryOfOrigin ?? "Saudi Arabia",
-      basePrice: initial.basePrice !== null && initial.basePrice !== undefined ? String(initial.basePrice) : "", availability: initial.availability ?? "in_stock",
+      name: initial.name ?? "",
+      description: initial.description ?? "",
+      minimumPurity: "",
+      minimumQuantity: String(initial.moq ?? ""),
+      maximumQuantity: "",
+      appearance: "",
+      categoryIds: Array.from(new Set(categoryIds)),
+      colors: "",
+      incoterms,
+      industries: "",
+      packaging: initial.packaging ?? "",
+      units: initial.moqUnit ?? "",
+      substances: initial.casNumber ?? "",
+      warehouses: "",
+      deliveryLeadTime: initial.deliveryLeadTime ?? "2-4 weeks",
+      countryOfOrigin: initial.countryOfOrigin ?? "Saudi Arabia",
+      basePrice: initial.basePrice !== null && initial.basePrice !== undefined ? String(initial.basePrice) : "",
+      availability: initial.availability ?? "in_stock",
       technicalSpecsRaw: specs
         .filter((spec: any) => spec.name !== "Incoterm" && spec.name !== "Additional Category")
-        .map((spec: any) => `${spec.name ?? ""}:${spec.value ?? ""}:${spec.unit ?? ""}`).join("\n"),
+        .map((spec: any) => `${spec.name ?? ""}:${spec.value ?? ""}:${spec.unit ?? ""}`)
+        .join("\n"),
     };
   }, [initial, categories]);
+
   const [form, setForm] = useState<ProductFormData>(getInitialForm);
-  const [selectedCountries, setSelectedCountries] = useState<string[]>(["Saudi Arabia"]);
-  const [selectedIndustries, setSelectedIndustries] = useState<string[]>([]);
-  const [selectedWarehouses, setSelectedWarehouses] = useState<string[]>([]);
-  const [bulkRows, setBulkRows] = useState<Record<string, string>[]>([]);
-  const [bulkFileName, setBulkFileName] = useState("");
-  const [docFiles, setDocFiles] = useState<Record<string, File | null>>({});
-  const docInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
-  const bulkInputRef = useRef<HTMLInputElement | null>(null);
-  const [dragOver, setDragOver] = useState(false);
 
   useEffect(() => {
     const nextForm = getInitialForm();
-    setForm(nextForm);
     const applications = Array.isArray(initial?.applications) ? initial.applications : [];
+    setForm(nextForm);
     setSelectedIndustries(applications.filter((value: string) => !value.startsWith("Incoterm:") && !value.startsWith("Category:")));
     setSelectedCountries(initial?.countryOfOrigin ? [initial.countryOfOrigin] : ["Saudi Arabia"]);
     setSelectedWarehouses([]);
     setDocFiles({});
   }, [getInitialForm, open, initial]);
 
+  const f = (key: keyof ProductFormData) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+    setForm((prev) => ({ ...prev, [key]: e.target.value }));
+
   const handleDocSelect = (docName: string, file: File | null) => {
-    setDocFiles(prev => ({ ...prev, [docName]: file ?? null }));
+    setDocFiles((prev) => ({ ...prev, [docName]: file ?? null }));
   };
 
   const parseBulkFile = useCallback((file: File) => {
@@ -144,7 +229,7 @@ function ProductFormDialog({
         const json = XLSX.utils.sheet_to_json<Record<string, string>>(sheet, { defval: "" });
         setBulkRows(json.slice(0, 5));
         setBulkFileName(file.name);
-        toast({ title: "File loaded", description: `${file.name} — ${json.length} row(s) found.` });
+        toast({ title: "File loaded", description: `${file.name} - ${json.length} row(s) found.` });
       } catch {
         toast({ title: "Could not parse file", description: "Please upload a valid .csv or .xlsx file.", variant: "destructive" });
       }
@@ -165,9 +250,6 @@ function ProductFormDialog({
     XLSX.utils.book_append_sheet(wb, ws, "Products");
     XLSX.writeFile(wb, "chemidot_product_template.xlsx");
   };
-
-  const f = (key: keyof ProductFormData) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
-    setForm(p => ({ ...p, [key]: e.target.value }));
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -190,13 +272,18 @@ function ProductFormDialog({
         return { name, value, unit };
       })
       .filter((spec) => spec.name && spec.value);
+
     const enrichedTechnicalSpecs = [
       ...technicalSpecs,
+      ...(form.minimumPurity ? [{ name: "Purity", value: form.minimumPurity, unit: "%" }] : []),
+      ...(form.appearance ? [{ name: "Appearance", value: form.appearance, unit: "" }] : []),
+      ...(form.colors ? [{ name: "Color", value: form.colors, unit: "" }] : []),
+      ...(form.maximumQuantity ? [{ name: "Maximum Quantity", value: form.maximumQuantity, unit: form.units }] : []),
       ...form.incoterms.map((term) => ({ name: "Incoterm", value: term, unit: "" })),
       ...selectedCategoryNames.slice(1).map((categoryName) => ({ name: "Additional Category", value: categoryName, unit: "" })),
     ];
 
-    const createPayload = {
+    const payload = {
       name: form.name,
       description: form.description,
       casNumber: form.substances || undefined,
@@ -234,263 +321,225 @@ function ProductFormDialog({
     };
 
     if (initial?.id) {
-      updateProduct.mutate({
-        id: initial.id,
-        data: createPayload,
-      }, handlers);
+      updateProduct.mutate({ id: initial.id, data: payload }, handlers);
       return;
     }
 
-    createProduct.mutate({ data: createPayload }, handlers);
+    createProduct.mutate({ data: payload }, handlers);
   };
 
+  const selectedCategoryNames = categories
+    .filter((category) => form.categoryIds.includes(String(category.id)))
+    .map((category) => category.name);
+
   return (
-    <Dialog open={open} onOpenChange={v => !v && onClose()}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-h-[90vh] max-w-5xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{initial ? "Edit Product" : "Add Product"}</DialogTitle>
         </DialogHeader>
+
         <div className="flex items-center gap-3 text-sm text-muted-foreground">
           <Button type="button" variant="ghost" size="sm" onClick={onClose} className="gap-2 px-0">
             <ArrowLeft className="w-4 h-4" /> Back
           </Button>
-          <span className="text-xs uppercase tracking-wider">Add Product</span>
+          <span className="text-xs uppercase tracking-wider">Supplier catalog</span>
         </div>
+
         <Tabs defaultValue="manual" className="pt-2">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="manual">Manual Entry</TabsTrigger>
             <TabsTrigger value="bulk">Bulk Import</TabsTrigger>
           </TabsList>
+
           <TabsContent value="manual">
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <Card>
-                <CardHeader className="pb-3">
-                  <div className="flex items-center gap-2"><ClipboardList className="w-4 h-4 text-primary" /> Basic Information</div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {/* ── Row 1: Name · Description · Minimum Purity ── */}
-                  <div className="grid gap-4 md:grid-cols-3">
-                    <div className="space-y-1.5"><Label>Name</Label><Input value={form.name} onChange={f("name")} /></div>
-                    <div className="space-y-1.5"><Label>Description</Label><Textarea rows={3} value={form.description} onChange={f("description")} /></div>
-                    <div className="space-y-1.5"><Label>Minimum Purity (%)</Label><Input type="number" min="0" max="100" value={form.minimumPurity} onChange={f("minimumPurity")} /></div>
-                  </div>
-
-                  {/* ── Row 2: Min Qty · Max Qty ── */}
-                  <div className="grid gap-4 md:grid-cols-3">
-                    <div className="space-y-1.5"><Label>Minimum Quantity</Label><Input type="number" value={form.minimumQuantity} onChange={f("minimumQuantity")} /></div>
-                    <div className="space-y-1.5"><Label>Maximum Quantity</Label><Input type="number" value={form.maximumQuantity} onChange={f("maximumQuantity")} /></div>
-                  </div>
-
-                  {/* ── Row 3: Appearance · Colors · Categories ── */}
-                  <div className="grid gap-4 md:grid-cols-3">
-                    <div className="space-y-1.5">
-                      <Label>Appearance</Label>
-                      <select className="w-full h-10 rounded-md border bg-background px-3 text-sm" value={form.appearance} onChange={f("appearance")}>
-                        <option value="">Select appearance</option>
-                        {APPERANCE_OPTIONS.map(v => <option key={v}>{v}</option>)}
-                      </select>
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label>Color</Label>
-                      <select className="w-full h-10 rounded-md border bg-background px-3 text-sm" value={form.colors} onChange={f("colors")}>
-                        <option value="">Select color</option>
-                        {COLOR_OPTIONS.map(v => <option key={v}>{v}</option>)}
-                      </select>
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label>Category</Label>
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-2 rounded-md border p-3 max-h-48 overflow-y-auto">
-                        {categories.map((category) => {
-                          const id = String(category.id);
-                          return (
-                            <label key={category.id} className="flex items-center gap-2 text-sm cursor-pointer hover:text-foreground text-foreground/80">
-                              <input
-                                type="checkbox"
-                                className="accent-primary"
-                                checked={form.categoryIds.includes(id)}
-                                onChange={(e) => setForm((prev) => ({
-                                  ...prev,
-                                  categoryIds: e.target.checked
-                                    ? [...prev.categoryIds, id]
-                                    : prev.categoryIds.filter((value) => value !== id),
-                                }))}
-                              />
-                              {category.name}
-                            </label>
-                          );
-                        })}
-                      </div>
-                      <p className="text-xs text-muted-foreground">First selected category is used as the primary category.</p>
-                    </div>
-                  </div>
-
-                  {/* ── Row 4: Substance · Units · Packaging ── */}
-                  <div className="grid gap-4 md:grid-cols-3">
-                    <div className="space-y-1.5">
-                      <Label>Substance Type</Label>
-                      <select className="w-full h-10 rounded-md border bg-background px-3 text-sm" value={form.substances} onChange={f("substances")}>
-                        <option value="">Select substance</option>
-                        {SUBSTANCE_OPTIONS.map(v => <option key={v}>{v}</option>)}
-                      </select>
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label>Units</Label>
-                      <select className="w-full h-10 rounded-md border bg-background px-3 text-sm" value={form.units} onChange={f("units")}>
-                        <option value="">Select unit</option>
-                        {UNIT_OPTIONS.map(v => <option key={v}>{v}</option>)}
-                      </select>
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label>Packaging</Label>
-                      <select className="w-full h-10 rounded-md border bg-background px-3 text-sm" value={form.packaging} onChange={f("packaging")}>
-                        <option value="">Select packaging</option>
-                        {PACKAGING_OPTIONS.map(v => <option key={v}>{v}</option>)}
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* ── Row 5: Incoterms ── */}
-                  <div className="grid gap-4 md:grid-cols-3">
-                    <div className="space-y-1.5"><Label>Base Price (USD)</Label><Input type="number" min="0" step="0.01" value={form.basePrice} onChange={f("basePrice")} /></div>
-                    <div className="space-y-1.5"><Label>Country of Origin</Label><Input value={form.countryOfOrigin} onChange={f("countryOfOrigin")} /></div>
-                    <div className="space-y-1.5"><Label>Delivery Lead Time</Label><Input value={form.deliveryLeadTime} onChange={f("deliveryLeadTime")} /></div>
-                  </div>
-
-                  <div className="grid gap-4 md:grid-cols-3">
-                    <div className="space-y-1.5">
-                      <Label>Incoterms</Label>
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-2 rounded-md border p-3">
-                        {INCOTERM_OPTIONS.map((term) => (
-                          <label key={term} className="flex items-center gap-2 text-sm cursor-pointer hover:text-foreground text-foreground/80">
-                            <input
-                              type="checkbox"
-                              className="accent-primary"
-                              checked={form.incoterms.includes(term)}
-                              onChange={(e) => setForm((prev) => ({
-                                ...prev,
-                                incoterms: e.target.checked
-                                  ? [...prev.incoterms, term]
-                                  : prev.incoterms.filter((value) => value !== term),
-                              }))}
-                            />
-                            {term}
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label>Availability</Label>
-                      <select className="w-full h-10 rounded-md border bg-background px-3 text-sm" value={form.availability} onChange={f("availability")}>
-                        <option value="in_stock">In Stock</option>
-                        <option value="limited">Limited</option>
-                        <option value="out_of_stock">Out of Stock</option>
-                      </select>
-                    </div>
-                  </div>
-
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <SectionCard title="Basic Information" description="Start with the buyer-facing product basics. Keep the description short and specific.">
+                <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-1.5">
-                    <Label>Technical Specs</Label>
-                    <Textarea
-                      rows={4}
-                      value={form.technicalSpecsRaw}
-                      onChange={f("technicalSpecsRaw")}
-                      placeholder={"Format: Property:Value:Unit\nExample: Purity:99.5:%\nExample: Density:1.02:g/cm3"}
-                    />
+                    <Label>Product name *</Label>
+                    <Input value={form.name} onChange={f("name")} placeholder="e.g. Sodium Hydroxide 99%" required />
                   </div>
-
-                  {/* ── Row 6: Industries (multi-checkbox) ── */}
                   <div className="space-y-1.5">
-                    <Label>Industries</Label>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-2 rounded-md border p-3 max-h-48 overflow-y-auto">
-                      {INDUSTRY_OPTIONS.map(industry => (
-                        <label key={industry} className="flex items-center gap-2 text-sm cursor-pointer hover:text-foreground text-foreground/80">
-                          <input
-                            type="checkbox"
-                            className="accent-primary"
-                            checked={selectedIndustries.includes(industry)}
-                            onChange={e => setSelectedIndustries(prev => e.target.checked ? [...prev, industry] : prev.filter(x => x !== industry))}
-                          />
-                          {industry}
-                        </label>
-                      ))}
-                    </div>
+                    <Label>Substance type <span className="text-muted-foreground">(optional)</span></Label>
+                    <select className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={form.substances} onChange={f("substances")}>
+                      <option value="">Select substance</option>
+                      {SUBSTANCE_OPTIONS.map((value) => <option key={value}>{value}</option>)}
+                    </select>
                   </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Short description *</Label>
+                  <Textarea rows={3} value={form.description} onChange={f("description")} placeholder="Describe the product, grade, and main buyer use in 1-2 sentences." required />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Category *</Label>
+                  <OptionGrid
+                    options={categories.map((category) => category.name)}
+                    selected={selectedCategoryNames}
+                    onChange={(nextNames) => setForm((prev) => ({
+                      ...prev,
+                      categoryIds: categories.filter((category) => nextNames.includes(category.name)).map((category) => String(category.id)),
+                    }))}
+                  />
+                  <p className="text-xs text-muted-foreground">First selected category is used as the primary category.</p>
+                </div>
+              </SectionCard>
 
-                  {/* ── Row 7: Delivery Countries (multi-checkbox) ── */}
+              <SectionCard title="Product Specifications" description="Add the core technical identity. Optional values can stay empty if buyers should request them.">
+                <div className="grid gap-4 md:grid-cols-3">
                   <div className="space-y-1.5">
-                    <Label>Delivery Countries</Label>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-2 rounded-md border p-3">
-                      {COUNTRY_MULTI_OPTIONS.map(country => (
-                        <label key={country} className="flex items-center gap-2 text-sm cursor-pointer hover:text-foreground text-foreground/80">
-                          <input
-                            type="checkbox"
-                            className="accent-primary"
-                            checked={selectedCountries.includes(country)}
-                            onChange={e => setSelectedCountries(prev => e.target.checked ? [...prev, country] : prev.filter(x => x !== country))}
-                          />
-                          {country}
-                        </label>
-                      ))}
-                    </div>
+                    <Label>Purity <span className="text-muted-foreground">(optional)</span></Label>
+                    <Input type="number" min="0" max="100" value={form.minimumPurity} onChange={f("minimumPurity")} placeholder="99.5" />
                   </div>
+                  <div className="space-y-1.5">
+                    <Label>Appearance <span className="text-muted-foreground">(optional)</span></Label>
+                    <select className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={form.appearance} onChange={f("appearance")}>
+                      <option value="">Select appearance</option>
+                      {APPERANCE_OPTIONS.map((value) => <option key={value}>{value}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Color <span className="text-muted-foreground">(optional)</span></Label>
+                    <select className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={form.colors} onChange={f("colors")}>
+                      <option value="">Select color</option>
+                      {COLOR_OPTIONS.map((value) => <option key={value}>{value}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Additional technical specs <span className="text-muted-foreground">(optional)</span></Label>
+                  <Textarea
+                    rows={4}
+                    value={form.technicalSpecsRaw}
+                    onChange={f("technicalSpecsRaw")}
+                    placeholder={"Format: Property:Value:Unit\nExample: Chemical Name:Sodium Hydroxide:\nExample: Formula:NaOH:\nExample: Density:1.02:g/cm3"}
+                  />
+                </div>
+              </SectionCard>
 
-                  {/* ── Row 8: Warehouses (multi-checkbox) ── */}
+              <SectionCard title="Commercial Terms" description="Help buyers understand quantity, delivery, packaging, and quote expectations.">
+                <div className="grid gap-4 md:grid-cols-3">
                   <div className="space-y-1.5">
-                    <Label>Warehouses</Label>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-2 rounded-md border p-3">
-                      {WAREHOUSE_OPTIONS.map(wh => (
-                        <label key={wh} className="flex items-center gap-2 text-sm cursor-pointer hover:text-foreground text-foreground/80">
-                          <input
-                            type="checkbox"
-                            className="accent-primary"
-                            checked={selectedWarehouses.includes(wh)}
-                            onChange={e => setSelectedWarehouses(prev => e.target.checked ? [...prev, wh] : prev.filter(x => x !== wh))}
-                          />
-                          {wh}
-                        </label>
-                      ))}
-                    </div>
+                    <Label>Minimum quantity *</Label>
+                    <Input type="number" min="0" value={form.minimumQuantity} onChange={f("minimumQuantity")} placeholder="1000" required />
                   </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="pb-3">
-                  <div className="flex items-center gap-2"><FileText className="w-4 h-4 text-primary" /> Documentation</div>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {DOCUMENTS.map(doc => (
+                  <div className="space-y-1.5">
+                    <Label>Maximum quantity <span className="text-muted-foreground">(optional)</span></Label>
+                    <Input type="number" min="0" value={form.maximumQuantity} onChange={f("maximumQuantity")} placeholder="50000" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Unit *</Label>
+                    <select className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={form.units} onChange={f("units")} required>
+                      <option value="">Select unit</option>
+                      {UNIT_OPTIONS.map((value) => <option key={value}>{value}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div className="space-y-1.5">
+                    <Label>Packaging</Label>
+                    <select className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={form.packaging} onChange={f("packaging")}>
+                      <option value="">Select packaging</option>
+                      {PACKAGING_OPTIONS.map((value) => <option key={value}>{value}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Lead time</Label>
+                    <Input value={form.deliveryLeadTime} onChange={f("deliveryLeadTime")} placeholder="2-4 weeks" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Estimated price <span className="text-muted-foreground">(optional)</span></Label>
+                    <Input type="number" min="0" step="0.01" value={form.basePrice} onChange={f("basePrice")} placeholder="USD" />
+                  </div>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label>Country of origin</Label>
+                    <Input value={form.countryOfOrigin} onChange={f("countryOfOrigin")} placeholder="Saudi Arabia" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Availability</Label>
+                    <select className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={form.availability} onChange={f("availability")}>
+                      <option value="in_stock">In Stock</option>
+                      <option value="limited">Limited</option>
+                      <option value="out_of_stock">Out of Stock</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Incoterms</Label>
+                  <OptionGrid options={INCOTERM_OPTIONS} selected={form.incoterms} onChange={(next) => setForm((prev) => ({ ...prev, incoterms: next }))} maxHeight="max-h-32" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Regional availability</Label>
+                  <OptionGrid options={COUNTRY_MULTI_OPTIONS} selected={selectedCountries} onChange={setSelectedCountries} maxHeight="max-h-36" />
+                </div>
+              </SectionCard>
+
+              <SectionCard title="Applications & Industries" description="Choose the buyer markets where this product should appear.">
+                <div className="space-y-1.5">
+                  <Label>Industries</Label>
+                  <OptionGrid options={INDUSTRY_OPTIONS} selected={selectedIndustries} onChange={setSelectedIndustries} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Warehouses <span className="text-muted-foreground">(optional)</span></Label>
+                  <OptionGrid options={WAREHOUSE_OPTIONS} selected={selectedWarehouses} onChange={setSelectedWarehouses} maxHeight="max-h-36" />
+                </div>
+              </SectionCard>
+
+              <SectionCard title="Documents" description="Documents help buyers trust your product and request quotes faster. Uploads are optional.">
+                <div className="grid gap-3 md:grid-cols-3">
+                  {DOCUMENTS.map((doc) => (
                     <div key={doc}>
                       <input
                         type="file"
-                        accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
+                        accept=".pdf,.doc,.docx,.xls,.xlsx"
                         className="hidden"
-                        ref={el => { docInputRefs.current[doc] = el; }}
-                        onChange={e => handleDocSelect(doc, e.target.files?.[0] ?? null)}
+                        ref={(el) => { docInputRefs.current[doc] = el; }}
+                        onChange={(e) => handleDocSelect(doc, e.target.files?.[0] ?? null)}
                       />
                       <Button
                         type="button"
                         variant="outline"
-                        className={`w-full justify-start gap-2 ${docFiles[doc] ? "border-primary/50 bg-primary/5" : ""}`}
+                        className={`h-auto min-h-16 w-full justify-start gap-2 whitespace-normal text-left ${docFiles[doc] ? "border-primary/50 bg-primary/5" : ""}`}
                         onClick={() => docInputRefs.current[doc]?.click()}
                       >
-                        <Upload className="w-4 h-4" />
+                        <Upload className="h-4 w-4 shrink-0" />
                         {docFiles[doc] ? (
-                          <span className="flex items-center gap-2 truncate">
-                            <span className="truncate">{docFiles[doc]!.name}</span>
-                            <span className="text-xs text-muted-foreground shrink-0">({(docFiles[doc]!.size / 1024).toFixed(0)} KB)</span>
+                          <span className="min-w-0">
+                            <span className="block truncate">{docFiles[doc]!.name}</span>
+                            <span className="text-xs text-muted-foreground">{(docFiles[doc]!.size / 1024).toFixed(0)} KB</span>
                           </span>
-                        ) : doc}
+                        ) : (
+                          <span>{doc}</span>
+                        )}
                       </Button>
                     </div>
                   ))}
-                </CardContent>
-              </Card>
-              <div className="flex justify-end gap-2 pt-2 border-t">
+                </div>
+              </SectionCard>
+
+              <SectionCard title="Review & Submit" description="Quick check before this product is saved to your catalog.">
+                <div className="grid gap-3 rounded-lg bg-muted/30 p-4 text-sm md:grid-cols-3">
+                  <div><span className="text-muted-foreground">Product</span><div className="font-medium">{form.name || "Not entered"}</div></div>
+                  <div><span className="text-muted-foreground">Category</span><div className="font-medium">{selectedCategoryNames[0] ?? "Not selected"}</div></div>
+                  <div><span className="text-muted-foreground">Purity</span><div className="font-medium">{form.minimumPurity ? `${form.minimumPurity}%` : "Optional"}</div></div>
+                  <div><span className="text-muted-foreground">MOQ</span><div className="font-medium">{form.minimumQuantity || "Not entered"} {form.units}</div></div>
+                  <div><span className="text-muted-foreground">Incoterms</span><div className="font-medium">{form.incoterms.length ? form.incoterms.join(", ") : "Available on request"}</div></div>
+                  <div><span className="text-muted-foreground">Documents</span><div className="font-medium">{Object.values(docFiles).filter(Boolean).length || 0} uploaded</div></div>
+                </div>
+              </SectionCard>
+
+              <div className="flex justify-end gap-2 border-t pt-4">
                 <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-                <Button type="submit" disabled={createProduct.isPending}>{createProduct.isPending ? "Saving…" : "Save Product"}</Button>
+                <Button type="submit" disabled={createProduct.isPending || updateProduct.isPending}>
+                  {(createProduct.isPending || updateProduct.isPending) ? "Saving..." : initial?.id ? "Save Changes" : "Submit Product"}
+                </Button>
               </div>
             </form>
           </TabsContent>
+
           <TabsContent value="bulk" className="space-y-4">
             <Card>
               <CardContent className="p-6">
@@ -499,11 +548,15 @@ function ProductFormDialog({
                   accept=".csv,.xlsx,.xls"
                   className="hidden"
                   ref={bulkInputRef}
-                  onChange={e => { const file = e.target.files?.[0]; if (file) parseBulkFile(file); e.target.value = ""; }}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) parseBulkFile(file);
+                    e.target.value = "";
+                  }}
                 />
                 <div
-                  className={`rounded-2xl border-2 border-dashed p-10 text-center space-y-3 transition-colors ${dragOver ? "border-primary bg-primary/5" : "bg-muted/20"}`}
-                  onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+                  className={`rounded-xl border border-dashed p-10 text-center space-y-3 transition-colors ${dragOver ? "border-primary bg-primary/5" : "bg-muted/20"}`}
+                  onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
                   onDragLeave={() => setDragOver(false)}
                   onDrop={handleBulkDrop}
                 >
@@ -511,7 +564,7 @@ function ProductFormDialog({
                   {bulkFileName ? (
                     <>
                       <p className="font-semibold text-primary">{bulkFileName}</p>
-                      <p className="text-sm text-muted-foreground">{bulkRows.length} row(s) loaded — preview below.</p>
+                      <p className="text-sm text-muted-foreground">{bulkRows.length} row(s) loaded - preview below.</p>
                     </>
                   ) : (
                     <>
@@ -532,16 +585,16 @@ function ProductFormDialog({
                 <div className="overflow-auto rounded-lg border">
                   <table className="w-full text-sm">
                     <thead className="bg-muted/40">
-                      <tr>{(bulkRows.length > 0 ? Object.keys(bulkRows[0]) : TEMPLATE_HEADERS).map(h => <th key={h} className="px-3 py-2 text-left font-medium whitespace-nowrap">{h}</th>)}</tr>
+                      <tr>{(bulkRows.length > 0 ? Object.keys(bulkRows[0]) : TEMPLATE_HEADERS).map((h) => <th key={h} className="px-3 py-2 text-left font-medium whitespace-nowrap">{h}</th>)}</tr>
                     </thead>
                     <tbody>
                       {bulkRows.length > 0 ? bulkRows.map((row, i) => (
                         <tr key={i} className="border-t">
                           {Object.values(row).map((v, j) => <td key={j} className="px-3 py-2 whitespace-nowrap">{String(v) || "-"}</td>)}
                         </tr>
-                      )) : [1,2,3,4,5].map(r => (
+                      )) : [1, 2, 3, 4, 5].map((r) => (
                         <tr key={r} className="border-t">
-                          {TEMPLATE_HEADERS.map(h => <td key={h} className="px-3 py-2 text-muted-foreground">-</td>)}
+                          {TEMPLATE_HEADERS.map((h) => <td key={h} className="px-3 py-2 text-muted-foreground">-</td>)}
                         </tr>
                       ))}
                     </tbody>
@@ -549,9 +602,18 @@ function ProductFormDialog({
                 </div>
               </CardContent>
             </Card>
-            <div className="flex justify-end gap-2 pt-2 border-t">
+            <div className="flex justify-end gap-2 border-t pt-4">
               <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-              <Button type="button" disabled={!bulkFileName} onClick={() => { toast({ title: "Import started", description: `Importing ${bulkRows.length} product(s) from ${bulkFileName}.` }); onClose(); }}>{bulkFileName ? `Import ${bulkRows.length} Product(s)` : "Upload first"}</Button>
+              <Button
+                type="button"
+                disabled={!bulkFileName}
+                onClick={() => {
+                  toast({ title: "Import started", description: `Importing ${bulkRows.length} product(s) from ${bulkFileName}.` });
+                  onClose();
+                }}
+              >
+                {bulkFileName ? `Import ${bulkRows.length} Product(s)` : "Upload first"}
+              </Button>
             </div>
           </TabsContent>
         </Tabs>
@@ -654,12 +716,12 @@ export default function SupplierProducts() {
     });
   };
 
-  const availBadge = (av: string) => {
-    switch (av) {
+  const availBadge = (availability: string) => {
+    switch (availability) {
       case "in_stock": return <Badge className="bg-green-100 text-green-800 hover:bg-green-100 border-none dark:bg-green-900/30 dark:text-green-400">In Stock</Badge>;
       case "limited": return <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100 border-none dark:bg-yellow-900/30 dark:text-yellow-400">Limited</Badge>;
       case "out_of_stock": return <Badge variant="secondary" className="text-muted-foreground">Out of Stock</Badge>;
-      default: return <Badge variant="outline">{av}</Badge>;
+      default: return <Badge variant="outline">{availability}</Badge>;
     }
   };
 
@@ -703,11 +765,11 @@ export default function SupplierProducts() {
           </Button>
         </div>
 
-        <Card className="border-orange-500/10 shadow-sm">
+        <Card className="shadow-sm">
           <CardContent className="p-0">
             {isLoading || loadingSupplierId ? (
               <div className="p-6 space-y-4">
-                {[1, 2, 3].map(i => <Skeleton key={i} className="h-20 w-full" />)}
+                {[1, 2, 3].map((i) => <Skeleton key={i} className="h-20 w-full" />)}
               </div>
             ) : (data?.products ?? []).length === 0 ? (
               <div className="py-16 text-center flex flex-col items-center">
@@ -720,26 +782,23 @@ export default function SupplierProducts() {
               </div>
             ) : (
               <div className="divide-y">
-                {(data?.products ?? []).map(p => (
-                  <div key={p.id} className="flex items-center gap-4 p-4 hover:bg-muted/30 transition-colors">
-                    <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center shrink-0 overflow-hidden">
-                      {p.imageUrl
-                        ? <img src={p.imageUrl} alt={p.name} className="w-full h-full object-cover" />
-                        : <Package className="w-5 h-5 text-muted-foreground" />
-                      }
+                {(data?.products ?? []).map((product) => (
+                  <div key={product.id} className="flex items-center gap-4 p-4 hover:bg-muted/30 transition-colors">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-muted">
+                      <Package className="w-5 h-5 text-muted-foreground" />
                     </div>
-                    <div className="flex-1 min-w-0">
+                    <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium truncate">{p.name}</span>
-                        {availBadge(p.availability)}
-                        {p.collectiveEligible && (
+                        <span className="font-medium truncate">{product.name}</span>
+                        {availBadge(product.availability)}
+                        {product.collectiveEligible && (
                           <Badge variant="outline" className="text-primary border-primary/30 text-xs">Collective</Badge>
                         )}
                       </div>
                       <div className="text-sm text-muted-foreground mt-0.5 flex gap-3 flex-wrap">
-                        {p.casNumber && <span className="font-mono text-xs">{p.casNumber}</span>}
-                        <span>MOQ: {p.moq} {p.moqUnit}</span>
-                        {p.basePrice && <span>Price: {p.currency} {p.basePrice.toLocaleString()}</span>}
+                        {product.casNumber && <span className="font-mono text-xs">{product.casNumber}</span>}
+                        <span>MOQ: {product.moq} {product.moqUnit}</span>
+                        {product.basePrice && <span>Price: {product.currency} {product.basePrice.toLocaleString()}</span>}
                       </div>
                     </div>
                     <DropdownMenu>
@@ -749,10 +808,10 @@ export default function SupplierProducts() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => { void handleEdit(p); }}>
+                        <DropdownMenuItem onClick={() => { void handleEdit(product); }}>
                           <Edit className="w-4 h-4 mr-2" /> Edit
                         </DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(p.id)}>
+                        <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(product.id)}>
                           <Trash2 className="w-4 h-4 mr-2" /> Delete
                         </DropdownMenuItem>
                       </DropdownMenuContent>
