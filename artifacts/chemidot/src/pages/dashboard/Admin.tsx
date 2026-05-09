@@ -48,11 +48,12 @@ export default function AdminDashboard() {
   const isAdmin = user?.role === "admin";
 
   const { data: stats, isLoading: statsLoading } = useGetAdminStats({
-    query: { enabled: isAdmin },
+    // Generated types require queryKey; we only need to toggle enabled.
+    query: { enabled: isAdmin } as any,
   });
   const { data: usersData, isLoading: usersLoading, refetch } = useAdminListUsers(
     { role: roleFilter, limit: 200 },
-    { query: { enabled: isAdmin } }
+    { query: { enabled: isAdmin } as any }
   );
 
   const updateStatusMutation = useAdminUpdateUserStatus();
