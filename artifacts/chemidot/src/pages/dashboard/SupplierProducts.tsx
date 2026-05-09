@@ -566,6 +566,7 @@ export default function SupplierProducts() {
   const [formOpen, setFormOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
   const [supplierId, setSupplierId] = useState<number | null>(null);
+  const [supplierProfile, setSupplierProfile] = useState<any>(null);
   const [loadingSupplierId, setLoadingSupplierId] = useState(false);
 
   useEffect(() => {
@@ -580,10 +581,14 @@ export default function SupplierProducts() {
         });
         if (!res.ok) throw new Error("Failed to load supplier profile");
         const profile = await res.json();
-        if (!cancelled) setSupplierId(profile.id ?? null);
+        if (!cancelled) {
+          setSupplierId(profile.id ?? null);
+          setSupplierProfile(profile);
+        }
       } catch {
         if (!cancelled) {
           setSupplierId(null);
+          setSupplierProfile(null);
           toast({ title: "Could not load supplier catalog", variant: "destructive" });
         }
       } finally {
@@ -602,6 +607,31 @@ export default function SupplierProducts() {
     { query: { enabled: !!supplierId } as any },
   );
   const deleteMutation = useDeleteProduct();
+  const isSuspended = supplierProfile?.subscriptionStatus === "suspended" || supplierProfile?.subscriptionStatus === "cancelled";
+  const productLimit = supplierProfile?.productLimit ?? null;
+  const currentProductCount = (data?.products ?? []).length;
+  const hasReachedLimit = typeof productLimit === "number" ? currentProductCount >= productLimit : false;
+
+  const openCreateDialog = () => {
+    if (isSuspended) {
+      toast({
+        title: "Account suspended",
+        description: "Your supplier account is currently suspended. Please contact Chemidot support to reactivate your storefront.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (hasReachedLimit) {
+      toast({
+        title: "Product limit reached",
+        description: "You have reached your current plan limit. Please upgrade to publish more products.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setEditingProduct(null);
+    setFormOpen(true);
+  };
 
   const handleEdit = async (product: any) => {
     setFormOpen(true);
@@ -636,12 +666,39 @@ export default function SupplierProducts() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
+        {isSuspended && (
+          <Card className="border-destructive/20 bg-destructive/5">
+            <CardContent className="p-4 text-sm text-destructive">
+              Your supplier account is currently suspended. Please contact Chemidot support to reactivate your storefront.
+            </CardContent>
+          </Card>
+        )}
+
+        <Card className="border-primary/10 bg-primary/5">
+          <CardContent className="flex flex-col gap-2 p-4 text-sm sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="font-semibold capitalize">
+                Plan: {supplierProfile?.supplierPlan ?? "trial"} | Status: {supplierProfile?.subscriptionStatus ?? "trial"}
+              </div>
+              <div className="text-muted-foreground">
+                Products: {currentProductCount}{typeof productLimit === "number" ? ` / ${productLimit}` : " / Unlimited"}
+                {supplierProfile?.trialEndsAt ? ` | Trial ends ${new Date(supplierProfile.trialEndsAt).toLocaleDateString()}` : ""}
+              </div>
+            </div>
+            {hasReachedLimit && (
+              <div className="font-medium text-amber-700">
+                You have reached your plan limit. Upgrade to publish more products.
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">My Products</h1>
             <p className="text-muted-foreground">Manage your product catalog on the marketplace.</p>
           </div>
-          <Button className="shrink-0 gap-2" onClick={() => { setEditingProduct(null); setFormOpen(true); }}>
+          <Button className="shrink-0 gap-2" onClick={openCreateDialog} disabled={isSuspended || hasReachedLimit}>
             <Plus className="w-4 h-4" /> Add Product
           </Button>
         </div>
@@ -657,7 +714,7 @@ export default function SupplierProducts() {
                 <Package className="w-12 h-12 text-muted-foreground/30 mb-4" />
                 <h3 className="text-lg font-medium">No products yet</h3>
                 <p className="text-muted-foreground mt-1 mb-6">Add your first product to appear on the marketplace.</p>
-                <Button onClick={() => { setEditingProduct(null); setFormOpen(true); }}>
+                <Button onClick={openCreateDialog} disabled={isSuspended || hasReachedLimit}>
                   <Plus className="w-4 h-4 mr-2" /> Add First Product
                 </Button>
               </div>

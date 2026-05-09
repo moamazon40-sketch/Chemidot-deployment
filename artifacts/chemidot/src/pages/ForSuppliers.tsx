@@ -3,34 +3,34 @@ import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import {
   ArrowRight, ArrowUpRight, CheckCircle2, Globe2, BarChart3, MessageSquare,
-  ShieldCheck, Users, Zap, Star, Package, TrendingUp, Bell, Store
+  ShieldCheck, Users, Zap, Star, Package, TrendingUp, Bell, Store,
 } from "lucide-react";
 import { MotionCTAButton } from "@/components/MotionCTAButton";
 
 const BENEFITS = [
-  { icon: Globe2,       title: "Reach Thousands of Verified Buyers",   desc: "Your products are instantly visible to procurement managers at manufacturers, distributors, and research labs across Saudi Arabia and the wider Gulf." },
-  { icon: BarChart3,    title: "Data-Driven Sales Intelligence",       desc: "See who viewed your products, track RFQ conversion rates, and understand which industries are most interested in your catalog." },
-  { icon: MessageSquare,title: "Direct Buyer Communication",           desc: "Respond to RFQs, answer technical questions, and negotiate pricing directly, no middleman cutting into your margins." },
-  { icon: ShieldCheck,  title: "Verified Supplier Badge",              desc: "Our verification process signals credibility to buyers. Verified suppliers receive more quote requests than unverified listings." },
-  { icon: Users,        title: "Collective Order Participation",       desc: "List your products as eligible for collective buying and win bulk orders that aggregate demand from multiple buyers simultaneously." },
-  { icon: TrendingUp,   title: "Lower Cost of Customer Acquisition",   desc: "Stop spending on trade shows and cold outreach. Chemidot's inbound buyer traffic means qualified leads come to you, at a fraction of traditional marketing costs." },
+  { icon: Globe2, title: "Reach Thousands of Verified Buyers", desc: "Your products are instantly visible to procurement managers at manufacturers, distributors, and research labs across Saudi Arabia and the wider Gulf." },
+  { icon: BarChart3, title: "Data-Driven Sales Intelligence", desc: "See who viewed your products, track RFQ conversion rates, and understand which industries are most interested in your catalog." },
+  { icon: MessageSquare, title: "Direct Buyer Communication", desc: "Respond to RFQs, answer technical questions, and negotiate pricing directly, no middleman cutting into your margins." },
+  { icon: ShieldCheck, title: "Verified Supplier Badge", desc: "Our verification process signals credibility to buyers. Verified suppliers receive more quote requests than unverified listings." },
+  { icon: Users, title: "Collective Order Participation", desc: "List your products as eligible for collective buying and win bulk orders that aggregate demand from multiple buyers simultaneously." },
+  { icon: TrendingUp, title: "Lower Cost of Customer Acquisition", desc: "Stop spending on trade shows and cold outreach. Chemidot's inbound buyer traffic means qualified leads come to you, at a fraction of traditional marketing costs." },
 ];
 
 const STEPS = [
-  { step: "01", title: "Create Your Storefront",  desc: "Register, verify your commercial license, and upload your product catalog. Our team reviews your application within 48 hours.", icon: Store },
-  { step: "02", title: "List Your Products",      desc: "Add products with specifications, TDS/SDS documents, pricing tiers, MOQ, and availability. Buyers see exactly what they need to make decisions fast.", icon: Package },
-  { step: "03", title: "Receive & Close RFQs",   desc: "Buyers send you structured quote requests. Respond directly through the platform, negotiate, and confirm orders, all tracked and auditable.", icon: Bell },
+  { step: "01", title: "Create Your Storefront", desc: "Register, verify your commercial license, and upload your product catalog. Our team reviews your application within 48 hours.", icon: Store },
+  { step: "02", title: "List Your Products", desc: "Add products with specifications, TDS/SDS documents, pricing tiers, MOQ, and availability. Buyers see exactly what they need to make decisions fast.", icon: Package },
+  { step: "03", title: "Receive & Close RFQs", desc: "Buyers send you structured quote requests. Respond directly through the platform, negotiate, and confirm orders, all tracked and auditable.", icon: Bell },
 ];
 
 const FEATURES = [
   "Supplier storefront with branded profile page",
-  "Unlimited product listings with rich specifications",
+  "Plan-based product publishing limits",
   "TDS / SDS document upload and management",
   "Structured RFQ inbox with quote builder",
   "Real-time buyer messaging",
   "Collective order opt-in per product",
   "Analytics dashboard (views, RFQs, conversions)",
-  "Verified Supplier badge on all listings",
+  "Verified Supplier badge on eligible plans",
   "Multi-currency pricing (SAR, USD, EUR)",
   "Arabic and English product descriptions",
   "API access for catalog sync (Enterprise)",
@@ -38,17 +38,54 @@ const FEATURES = [
 ];
 
 const FEATURE_CARDS = [
-  { icon: Globe2,    title: "Gulf-Wide Buyers",       desc: "Reach buyers across Saudi Arabia & GCC" },
-  { icon: Zap,       title: "Fast Onboarding",        desc: "Go live within 48 hours of applying" },
-  { icon: BarChart3, title: "Sales Analytics",        desc: "Track views, RFQs & conversions" },
-  { icon: Store,     title: "Free to Join",           desc: "List products at no upfront cost" },
+  { icon: Globe2, title: "Gulf-Wide Buyers", desc: "Reach buyers across Saudi Arabia & GCC" },
+  { icon: Zap, title: "Fast Onboarding", desc: "Go live within 48 hours of applying" },
+  { icon: BarChart3, title: "Sales Analytics", desc: "Track views, RFQs & conversions" },
+  { icon: Store, title: "Trial First", desc: "Start with a free 14-day trial" },
+];
+
+const PRICING_PLANS = [
+  {
+    name: "Trial",
+    price: "Free",
+    sub: "14 days",
+    cta: "Start Free Trial",
+    href: "/auth/register",
+    featured: false,
+    features: ["Up to 3 products", "Basic supplier storefront", "Basic SDS/TDS support", "Limited RFQ visibility", "No premium exposure"],
+  },
+  {
+    name: "Starter",
+    price: "SAR 499",
+    sub: "per month or SAR 4,999/year",
+    cta: "Start Free Trial",
+    href: "/auth/register",
+    featured: false,
+    features: ["Up to 10 products", "Public storefront", "Basic RFQ access", "Buyer inquiries", "Standard marketplace visibility", "SDS/TDS uploads"],
+  },
+  {
+    name: "Growth",
+    price: "SAR 1,499",
+    sub: "per month or SAR 14,999/year",
+    cta: "Start Free Trial",
+    href: "/auth/register",
+    featured: true,
+    features: ["Up to 50 products", "Better marketplace ranking", "RFQ response access", "Featured product slots", "Supplier badge", "Basic analytics", "Priority support"],
+  },
+  {
+    name: "Enterprise",
+    price: "Custom",
+    sub: "For large manufacturers and strategic distributors",
+    cta: "Contact Sales",
+    href: "/contact",
+    featured: false,
+    features: ["High or unlimited catalog", "Premium placement", "Homepage featured supplier", "Custom onboarding", "Dedicated account handling", "Manual invoicing", "Future API/ERP support"],
+  },
 ];
 
 export default function ForSuppliers() {
   return (
     <MainLayout>
-
-      {/* ── Hero ── */}
       <section className="relative overflow-hidden bg-hero pt-32 pb-20">
         <div className="absolute inset-0 grid-pattern [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)]" />
         <div className="pointer-events-none absolute -top-24 right-0 h-96 w-96 rounded-full bg-accent/20 blur-3xl" />
@@ -61,15 +98,14 @@ export default function ForSuppliers() {
               <span>For Suppliers</span>
             </div>
             <h1 className="text-5xl font-extrabold leading-[1.05] tracking-tight text-primary md:text-6xl">
-              Grow your chemical business{" "}
-              <span className="text-gradient">across the Gulf.</span>
+              Grow your chemical business <span className="text-gradient">across the Gulf.</span>
             </h1>
             <p className="mx-auto max-w-2xl text-lg text-muted-foreground">
               Join verified suppliers already reaching industrial buyers on the Middle East's premier B2B chemical marketplace.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center pt-2">
               <MotionCTAButton href="/auth/register">
-                Start Selling Free <ArrowUpRight className="w-4 h-4" />
+                Start Free Trial <ArrowUpRight className="w-4 h-4" />
               </MotionCTAButton>
               <Link href="/contact">
                 <Button variant="outline" className="px-8">Talk to Our Team</Button>
@@ -77,9 +113,8 @@ export default function ForSuppliers() {
             </div>
           </div>
 
-          {/* Feature strip */}
           <div className="mx-auto mt-16 grid max-w-4xl grid-cols-2 gap-px overflow-hidden rounded-2xl border border-border bg-border md:grid-cols-4 shadow-card-premium">
-            {FEATURE_CARDS.map(f => (
+            {FEATURE_CARDS.map((f) => (
               <div key={f.title} className="bg-white px-5 py-6 text-center flex flex-col items-center gap-2">
                 <div className="w-9 h-9 rounded-lg bg-gradient-primary flex items-center justify-center shadow-glow mb-1">
                   <f.icon className="w-4 h-4 text-white" />
@@ -92,7 +127,6 @@ export default function ForSuppliers() {
         </div>
       </section>
 
-      {/* ── How it works ── */}
       <section className="py-20 border-b">
         <div className="mx-auto max-w-7xl px-6 md:px-10">
           <div className="text-center mb-14">
@@ -124,7 +158,6 @@ export default function ForSuppliers() {
         </div>
       </section>
 
-      {/* ── Benefits ── */}
       <section className="py-20 bg-surface-soft border-b">
         <div className="mx-auto max-w-7xl px-6 md:px-10">
           <div className="text-center max-w-2xl mx-auto mb-14">
@@ -133,7 +166,7 @@ export default function ForSuppliers() {
             <p className="text-lg text-muted-foreground">Built for chemical manufacturers and distributors who want qualified buyers, not just traffic.</p>
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {BENEFITS.map(b => (
+            {BENEFITS.map((b) => (
               <div key={b.title} className="group relative overflow-hidden rounded-xl border border-border bg-white p-6 shadow-card-premium transition-all hover:scale-[1.02] hover:border-accent/40 hover:shadow-glow">
                 <div className="absolute -right-10 -top-10 h-36 w-36 rounded-full bg-accent/5 blur-2xl transition-smooth group-hover:bg-accent/10" />
                 <div className="relative">
@@ -149,7 +182,6 @@ export default function ForSuppliers() {
         </div>
       </section>
 
-      {/* ── Features list ── */}
       <section className="py-20 border-b">
         <div className="mx-auto max-w-7xl px-6 md:px-10">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
@@ -164,7 +196,7 @@ export default function ForSuppliers() {
               </MotionCTAButton>
             </div>
             <div className="grid grid-cols-1 gap-3">
-              {FEATURES.map(f => (
+              {FEATURES.map((f) => (
                 <div key={f} className="flex items-center gap-3 py-2 border-b border-border last:border-b-0">
                   <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />
                   <span className="text-sm font-medium">{f}</span>
@@ -175,7 +207,47 @@ export default function ForSuppliers() {
         </div>
       </section>
 
-      {/* ── Testimonial ── */}
+      <section className="py-20 bg-surface-soft border-b">
+        <div className="mx-auto max-w-7xl px-6 md:px-10">
+          <div className="text-center max-w-3xl mx-auto mb-14">
+            <div className="mb-3 font-mono text-xs uppercase tracking-[0.2em] text-accent">// Pricing</div>
+            <h2 className="text-3xl md:text-4xl font-bold text-primary mb-4">Simple supplier plans for every growth stage.</h2>
+            <p className="text-lg text-muted-foreground">
+              Start with a free trial, then upgrade for more visibility, richer storefront tools, and stronger buyer lead access.
+            </p>
+          </div>
+          <div className="grid gap-6 lg:grid-cols-4">
+            {PRICING_PLANS.map((plan) => (
+              <div key={plan.name} className={`rounded-2xl border bg-white p-6 shadow-card-premium ${plan.featured ? "border-primary shadow-glow" : "border-border"}`}>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xl font-bold text-primary">{plan.name}</h3>
+                    {plan.featured ? <span className="rounded-full bg-primary/10 px-2 py-1 text-xs font-semibold text-primary">Recommended</span> : null}
+                  </div>
+                  <div>
+                    <div className="text-3xl font-extrabold text-primary">{plan.price}</div>
+                    <div className="text-sm text-muted-foreground">{plan.sub}</div>
+                  </div>
+                  <div className="space-y-2">
+                    {plan.features.map((feature) => (
+                      <div key={feature} className="flex items-start gap-2 text-sm">
+                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-green-500" />
+                        <span>{feature}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <Link href={plan.href}>
+                    <Button className="w-full" variant={plan.featured ? "default" : "outline"}>
+                      {plan.cta}
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <section className="py-20">
         <div className="mx-auto max-w-7xl px-6 md:px-10">
           <div className="max-w-3xl mx-auto text-center space-y-6">

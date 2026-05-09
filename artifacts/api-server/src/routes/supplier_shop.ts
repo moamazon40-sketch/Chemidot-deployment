@@ -13,6 +13,15 @@ import { insertSupplierBrandSchema, insertSupplierDocumentSchema, insertSupplier
 
 const router = Router();
 
+async function getPublicSupplierOr404(supplierId: number, res: any) {
+  const [supplier] = await db.select().from(suppliersTable).where(eq(suppliersTable.id, supplierId)).limit(1);
+  if (!supplier || !supplier.storefrontVisible) {
+    res.status(404).json({ message: "Supplier not found" });
+    return null;
+  }
+  return supplier;
+}
+
 async function getCurrentSupplierId(userId: number) {
   const [supplier] = await db.select().from(suppliersTable).where(eq(suppliersTable.userId, userId)).limit(1);
   return supplier?.id ?? null;
@@ -21,6 +30,8 @@ async function getCurrentSupplierId(userId: number) {
 router.get("/suppliers/:id/brands", asyncHandler(async (req, res) => {
   const supplierId = parseInt(String(req.params.id), 10);
   if (isNaN(supplierId)) { res.status(400).json({ message: "Invalid supplier id" }); return; }
+  const supplier = await getPublicSupplierOr404(supplierId, res);
+  if (!supplier) return;
   const brands = await db.select().from(supplierBrandsTable).where(eq(supplierBrandsTable.supplierId, supplierId));
   res.json(brands.map(b => ({
     id: b.id,
@@ -35,6 +46,8 @@ router.get("/suppliers/:id/brands", asyncHandler(async (req, res) => {
 router.get("/suppliers/:id/documents", asyncHandler(async (req, res) => {
   const supplierId = parseInt(String(req.params.id), 10);
   if (isNaN(supplierId)) { res.status(400).json({ message: "Invalid supplier id" }); return; }
+  const supplier = await getPublicSupplierOr404(supplierId, res);
+  if (!supplier) return;
   const docs = await db.select().from(supplierDocumentsTable).where(eq(supplierDocumentsTable.supplierId, supplierId));
   res.json(docs.map(d => ({
     id: d.id,
@@ -50,6 +63,8 @@ router.get("/suppliers/:id/documents", asyncHandler(async (req, res) => {
 router.get("/suppliers/:id/experts", asyncHandler(async (req, res) => {
   const supplierId = parseInt(String(req.params.id), 10);
   if (isNaN(supplierId)) { res.status(400).json({ message: "Invalid supplier id" }); return; }
+  const supplier = await getPublicSupplierOr404(supplierId, res);
+  if (!supplier) return;
   const experts = await db.select().from(supplierExpertsTable).where(eq(supplierExpertsTable.supplierId, supplierId));
   res.json(experts.map(e => ({
     id: e.id,

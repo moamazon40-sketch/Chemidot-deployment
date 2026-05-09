@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import { signToken, requireAuth } from "../middlewares/auth";
 import { asyncHandler } from "../middlewares/asyncHandler";
 import { RegisterBody, LoginBody } from "@workspace/api-zod";
+import { getPlanDefaults, getTrialEndDate } from "../lib/subscriptions";
 
 const router = Router();
 
@@ -36,6 +37,7 @@ router.post("/auth/register", asyncHandler(async (req, res) => {
   }).returning();
 
   if (body.role === "supplier") {
+    const defaults = getPlanDefaults("trial");
     await db.insert(suppliersTable).values({
       userId: user.id,
       companyName: body.companyName,
@@ -46,6 +48,16 @@ router.post("/auth/register", asyncHandler(async (req, res) => {
       verified: false,
       responseRate: "0",
       avgResponseTime: "24 hours",
+      supplierPlan: "trial",
+      subscriptionStatus: "trial",
+      trialEndsAt: getTrialEndDate(),
+      subscriptionStartedAt: new Date(),
+      billingCycle: defaults.billingCycle,
+      featuredSupplier: false,
+      productLimit: defaults.productLimit,
+      rfqAccessEnabled: defaults.rfqAccessEnabled,
+      storefrontVisible: true,
+      productsPublic: true,
     });
   }
 

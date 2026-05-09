@@ -8,6 +8,7 @@ import { eq, and, or, gte, lte, sql, desc, asc, ilike } from "drizzle-orm";
 import { requireAuth, requireRole, optionalAuth } from "../middlewares/auth";
 import { asyncHandler } from "../middlewares/asyncHandler";
 import { CreateProductBody, UpdateProductBody } from "@workspace/api-zod";
+import { canSupplierAccessRfqs, hasReachedProductLimit, isSupplierSuspended } from "../lib/subscriptions";
 
 const router = Router();
 const parseProductRequest = multer().none();
@@ -150,7 +151,11 @@ router.get("/products/featured", asyncHandler(async (_req, res) => {
   const rows = await db.select().from(productsTable)
     .leftJoin(suppliersTable, eq(suppliersTable.id, productsTable.supplierId))
     .leftJoin(categoriesTable, eq(categoriesTable.id, productsTable.categoryId))
-    .where(eq(productsTable.featured, true))
+    .where(and(
+      eq(productsTable.featured, true),
+      eq(suppliersTable.storefrontVisible, true),
+      eq(suppliersTable.productsPublic, true),
+    ))
     .limit(8);
 
   res.json(rows.map(r => buildProductShape(r.products, r.suppliers, r.categories, 0, null)));
@@ -160,6 +165,10 @@ router.get("/products/trending", asyncHandler(async (_req, res) => {
   const recentProducts = await db.select().from(productsTable)
     .leftJoin(suppliersTable, eq(suppliersTable.id, productsTable.supplierId))
     .leftJoin(categoriesTable, eq(categoriesTable.id, productsTable.categoryId))
+    .where(and(
+      eq(suppliersTable.storefrontVisible, true),
+      eq(suppliersTable.productsPublic, true),
+    ))
     .orderBy(desc(productsTable.createdAt))
     .limit(6);
 
@@ -216,6 +225,8 @@ router.get("/products", optionalAuth, asyncHandler(async (req, res) => {
   if (country) conditions.push(eq(suppliersTable.country, String(country)));
   if (verifiedSupplier === "true") conditions.push(eq(suppliersTable.verified, true));
   if (collectiveEligible === "true") conditions.push(eq(productsTable.collectiveEligible, true));
+  conditions.push(eq(suppliersTable.storefrontVisible, true));
+  conditions.push(eq(suppliersTable.productsPublic, true));
 
   const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
@@ -253,7 +264,11 @@ router.get("/products/:id", optionalAuth, asyncHandler(async (req, res) => {
   const rows = await db.select().from(productsTable)
     .leftJoin(suppliersTable, eq(suppliersTable.id, productsTable.supplierId))
     .leftJoin(categoriesTable, eq(categoriesTable.id, productsTable.categoryId))
-    .where(eq(productsTable.id, id))
+    .where(and(
+      eq(productsTable.id, id),
+      eq(suppliersTable.storefrontVisible, true),
+      eq(suppliersTable.productsPublic, true),
+    ))
     .limit(1);
 
   if (!rows[0]) {
@@ -305,7 +320,12 @@ router.get("/products/:id/related", asyncHandler(async (req, res) => {
   const rows = await db.select().from(productsTable)
     .leftJoin(suppliersTable, eq(suppliersTable.id, productsTable.supplierId))
     .leftJoin(categoriesTable, eq(categoriesTable.id, productsTable.categoryId))
-    .where(and(eq(productsTable.categoryId, product.categoryId), sql`${productsTable.id} != ${id}`))
+    .where(and(
+      eq(productsTable.categoryId, product.categoryId),
+      sql`${productsTable.id} != ${id}`,
+      eq(suppliersTable.storefrontVisible, true),
+      eq(suppliersTable.productsPublic, true),
+    ))
     .limit(6);
 
   res.json(rows.map(r => buildProductShape(r.products, r.suppliers, r.categories, 0, null)));
@@ -327,6 +347,16 @@ router.post("/products", parseProductRequest, requireAuth, requireRole("supplier
   const [supplier] = await db.select().from(suppliersTable).where(eq(suppliersTable.userId, user.id)).limit(1);
   if (!supplier) {
     res.status(403).json({ message: "Supplier profile not found" });
+    return;
+  }
+  if (isSupplierSuspended(supplier)) {
+    res.status(403).json({ message: "Your supplier account is currently suspended. Please contact Chemidot support to reactivate your storefront." });
+    return;
+  }
+  const [countRow] = await db.select({ count: sql<number>`cast(count(*) as int)` }).from(productsTable).where(eq(productsTable.supplierId, supplier.id));
+  const productCount = countRow?.count ?? 0;
+  if (hasReachedProductLimit(supplier, productCount)) {
+    res.status(403).json({ message: "You have reached your product limit for the current plan. Please upgrade to publish more products." });
     return;
   }
   const body = parsed.data;
@@ -403,6 +433,10 @@ router.put("/products/:id", requireAuth, requireRole("supplier"), asyncHandler(a
   const [supplier] = await db.select().from(suppliersTable).where(eq(suppliersTable.userId, user.id)).limit(1);
   if (!supplier) {
     res.status(403).json({ message: "Supplier profile not found" });
+    return;
+  }
+  if (isSupplierSuspended(supplier)) {
+    res.status(403).json({ message: "Your supplier account is currently suspended. Please contact Chemidot support to reactivate your storefront." });
     return;
   }
 

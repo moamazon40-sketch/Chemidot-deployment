@@ -29,6 +29,8 @@ import {
   Star,
   Save,
   Plus,
+  EyeOff,
+  CreditCard,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect, useMemo, useState } from "react";
@@ -61,6 +63,30 @@ type SupplierRow = {
   featured?: boolean;
   productCount?: number;
   createdAt?: string;
+  owner?: {
+    id: number;
+    email: string;
+    status: string;
+    role: string;
+  } | null;
+  supplierPlan: "trial" | "starter" | "growth" | "enterprise";
+  subscriptionStatus: "trial" | "active" | "past_due" | "suspended" | "cancelled";
+  featuredSupplier?: boolean;
+  trialEndsAt?: string | null;
+  gracePeriodEndsAt?: string | null;
+  subscriptionStartedAt?: string | null;
+  subscriptionRenewalDate?: string | null;
+  billingCycle?: "monthly" | "yearly" | "custom";
+  internalAdminNotes?: string | null;
+  productLimit?: number | null;
+  rfqAccessEnabled?: boolean;
+  storefrontVisible?: boolean;
+  productsPublic?: boolean;
+  recentAudit?: Array<{
+    id: number;
+    action: string;
+    createdAt: string | null;
+  }>;
 };
 
 type ProductRow = {
@@ -197,6 +223,9 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [newCategoryName, setNewCategoryName] = useState("");
+  const [supplierPlanFilter, setSupplierPlanFilter] = useState("all");
+  const [supplierStatusFilter, setSupplierStatusFilter] = useState("all");
+  const [supplierFeaturedFilter, setSupplierFeaturedFilter] = useState("all");
   const isAdmin = user?.role === "admin";
 
   const loadAdminData = async () => {
@@ -251,7 +280,14 @@ export default function AdminDashboard() {
           .includes(q)
       ),
       suppliers: data.suppliers.filter((item) =>
-        [item.companyName, item.country, item.verified ? "verified" : "pending"].join(" ").toLowerCase().includes(q)
+        [
+          item.companyName,
+          item.country,
+          item.owner?.email,
+          item.verified ? "verified" : "pending",
+          item.supplierPlan,
+          item.subscriptionStatus,
+        ].filter(Boolean).join(" ").toLowerCase().includes(q)
       ),
       products: data.products.filter((item) =>
         [item.name, item.availability, item.supplier?.companyName, item.category?.name].filter(Boolean).join(" ").toLowerCase().includes(q)
@@ -297,6 +333,15 @@ export default function AdminDashboard() {
     loadAdminData();
   };
 
+  const updateSupplierSubscription = async (id: number, body: Record<string, unknown>, title = "Subscription updated") => {
+    await adminRequest(`/api/admin/suppliers/${id}/subscription`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    });
+    toast({ title });
+    loadAdminData();
+  };
+
   const updateProduct = async (id: number, body: Record<string, unknown>) => {
     await adminRequest(`/api/admin/products/${id}`, {
       method: "PATCH",
@@ -338,6 +383,14 @@ export default function AdminDashboard() {
     toast({ title: "Category updated" });
     loadAdminData();
   };
+
+  const visibleSuppliers = filtered.suppliers.filter((row) => {
+    if (supplierPlanFilter !== "all" && row.supplierPlan !== supplierPlanFilter) return false;
+    if (supplierStatusFilter !== "all" && row.subscriptionStatus !== supplierStatusFilter) return false;
+    if (supplierFeaturedFilter === "featured" && !row.featuredSupplier) return false;
+    if (supplierFeaturedFilter === "standard" && row.featuredSupplier) return false;
+    return true;
+  });
 
   if (!isAdmin) {
     return (
@@ -450,33 +503,153 @@ export default function AdminDashboard() {
 
           <TabsContent value="suppliers">
             <Card>
-              <CardHeader><CardTitle>Companies & Suppliers</CardTitle></CardHeader>
+              <CardHeader>
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <CardTitle>Companies & Suppliers</CardTitle>
+                  <div className="flex flex-wrap gap-2">
+                    <SmallSelect value={supplierPlanFilter} onChange={setSupplierPlanFilter} options={["all", "trial", "starter", "growth", "enterprise"]} />
+                    <SmallSelect value={supplierStatusFilter} onChange={setSupplierStatusFilter} options={["all", "trial", "active", "past_due", "suspended", "cancelled"]} />
+                    <SmallSelect value={supplierFeaturedFilter} onChange={setSupplierFeaturedFilter} options={["all", "featured", "standard"]} />
+                  </div>
+                </div>
+              </CardHeader>
               <CardContent>
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Company</TableHead>
+                      <TableHead>Plan</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Products</TableHead>
                       <TableHead>Country</TableHead>
-                      <TableHead>Verified</TableHead>
                       <TableHead>Featured</TableHead>
+                      <TableHead>Trial End</TableHead>
+                      <TableHead>Visibility</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filtered.suppliers.length === 0 ? <EmptyRow colSpan={5} label="No suppliers found." /> : filtered.suppliers.map((row) => (
+                    {visibleSuppliers.length === 0 ? <EmptyRow colSpan={8} label="No suppliers found." /> : visibleSuppliers.map((row) => (
                       <TableRow key={row.id}>
-                        <TableCell className="font-medium">{row.companyName}</TableCell>
+                        <TableCell>
+                          <div className="font-medium">{row.companyName}</div>
+                          <div className="text-xs text-muted-foreground">{row.owner?.email ?? "No owner email"}</div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-2">
+                            <StatusBadge value={row.supplierPlan} />
+                            <SmallSelect
+                              value={row.supplierPlan}
+                              onChange={(supplierPlan) => updateSupplierSubscription(row.id, { supplierPlan, action: "assign_plan" }, "Supplier plan updated")}
+                              options={["trial", "starter", "growth", "enterprise"]}
+                            />
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-2">
+                            <StatusBadge value={row.subscriptionStatus} />
+                            <SmallSelect
+                              value={row.subscriptionStatus}
+                              onChange={(subscriptionStatus) => {
+                                if (subscriptionStatus === "cancelled" && !confirm(`Cancel subscription for ${row.companyName}? This will hide the storefront and products.`)) return;
+                                if (subscriptionStatus === "suspended" && !confirm(`Suspend ${row.companyName}? This will hide the storefront and products.`)) return;
+                                void updateSupplierSubscription(row.id, { subscriptionStatus }, "Subscription status updated");
+                              }}
+                              options={["trial", "active", "past_due", "suspended", "cancelled"]}
+                            />
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-medium">{row.productCount ?? 0}{row.productLimit ? ` / ${row.productLimit}` : ""}</div>
+                          <div className="text-xs text-muted-foreground">{row.rfqAccessEnabled ? "RFQ enabled" : "RFQ off"}</div>
+                        </TableCell>
                         <TableCell>{row.country}</TableCell>
-                        <TableCell><StatusBadge value={row.verified} /></TableCell>
-                        <TableCell><StatusBadge value={!!row.featured} /></TableCell>
+                        <TableCell><StatusBadge value={!!row.featuredSupplier} /></TableCell>
+                        <TableCell>{row.trialEndsAt ? new Date(row.trialEndsAt).toLocaleDateString() : "-"}</TableCell>
+                        <TableCell>
+                          <div className="space-y-1">
+                            <div className="text-xs">Storefront: <span className="font-medium">{row.storefrontVisible ? "Public" : "Hidden"}</span></div>
+                            <div className="text-xs">Products: <span className="font-medium">{row.productsPublic ? "Public" : "Hidden"}</span></div>
+                          </div>
+                        </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
+                          <div className="flex flex-wrap justify-end gap-2">
                             <Button variant="outline" size="sm" onClick={() => updateSupplier(row.id, { verified: !row.verified })}>
                               {row.verified ? "Unverify" : "Verify"}
                             </Button>
-                            <Button variant="outline" size="sm" onClick={() => updateSupplier(row.id, { featured: !row.featured })}>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => updateSupplierSubscription(row.id, { featuredSupplier: !row.featuredSupplier, action: "toggle_featured" }, "Featured supplier updated")}
+                            >
                               <Star className="mr-1 h-3.5 w-3.5" />
-                              {row.featured ? "Unfeature" : "Feature"}
+                              {row.featuredSupplier ? "Unfeature" : "Feature"}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                const trialEndsAt = prompt("Trial end date (YYYY-MM-DD)", row.trialEndsAt ? row.trialEndsAt.slice(0, 10) : "");
+                                if (!trialEndsAt) return;
+                                const gracePeriodEndsAt = prompt("Grace period end date (optional, YYYY-MM-DD)", row.gracePeriodEndsAt ? row.gracePeriodEndsAt.slice(0, 10) : "");
+                                void updateSupplierSubscription(row.id, {
+                                  action: "start_trial",
+                                  trialEndsAt: `${trialEndsAt}T00:00:00.000Z`,
+                                  gracePeriodEndsAt: gracePeriodEndsAt ? `${gracePeriodEndsAt}T00:00:00.000Z` : null,
+                                }, "Trial started");
+                              }}
+                            >
+                              <CreditCard className="mr-1 h-3.5 w-3.5" />
+                              Trial
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                if (!confirm(`Suspend ${row.companyName}? This will hide the storefront and unpublish products.`)) return;
+                                void updateSupplierSubscription(row.id, { action: "suspend" }, "Supplier suspended");
+                              }}
+                            >
+                              Suspend
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => updateSupplierSubscription(row.id, { action: "reactivate" }, "Supplier reactivated")}
+                            >
+                              Reactivate
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                if (!confirm(`Hide storefront for ${row.companyName}?`)) return;
+                                void updateSupplierSubscription(row.id, { action: row.storefrontVisible ? "hide_storefront" : "show_storefront" }, row.storefrontVisible ? "Storefront hidden" : "Storefront shown");
+                              }}
+                            >
+                              <EyeOff className="mr-1 h-3.5 w-3.5" />
+                              {row.storefrontVisible ? "Hide" : "Show"}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                if (row.productsPublic && !confirm(`Unpublish all public products for ${row.companyName}?`)) return;
+                                void updateSupplierSubscription(row.id, { action: row.productsPublic ? "unpublish_products" : "publish_products" }, row.productsPublic ? "Products unpublished" : "Products republished");
+                              }}
+                            >
+                              {row.productsPublic ? "Unpublish Products" : "Publish Products"}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                const internalAdminNotes = prompt("Internal admin notes", row.internalAdminNotes ?? "");
+                                if (internalAdminNotes === null) return;
+                                void updateSupplierSubscription(row.id, { internalAdminNotes, action: "update_notes" }, "Admin notes updated");
+                              }}
+                            >
+                              Notes
                             </Button>
                           </div>
                         </TableCell>

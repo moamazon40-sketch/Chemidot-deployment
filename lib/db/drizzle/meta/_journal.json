@@ -15,6 +15,13 @@
       "when": 1777909085923,
       "tag": "0001_faithful_sister_grimm",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1778358000000,
+      "tag": "0002_supplier_subscriptions",
+      "breakpoints": true
     }
   ]
 }

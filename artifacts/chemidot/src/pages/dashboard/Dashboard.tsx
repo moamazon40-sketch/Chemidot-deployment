@@ -407,6 +407,19 @@ function SupplierDashboard() {
 
   if (isLoading) return <DashboardSkeleton />;
   if (!stats) return null;
+  const subscription = stats as typeof stats & {
+    supplierPlan?: string;
+    subscriptionStatus?: string;
+    trialEndsAt?: string | null;
+    gracePeriodEndsAt?: string | null;
+    subscriptionRenewalDate?: string | null;
+    productLimit?: number | null;
+    hasReachedProductLimit?: boolean;
+    storefrontVisible?: boolean;
+    productsPublic?: boolean;
+    rfqAccessEnabled?: boolean;
+  };
+  const isSuspended = subscription.subscriptionStatus === "suspended" || subscription.subscriptionStatus === "cancelled";
 
   /* Donut data */
   const donutData = [
@@ -421,6 +434,12 @@ function SupplierDashboard() {
 
   return (
     <div className="space-y-6">
+      {isSuspended && (
+        <div className="rounded-xl border border-destructive/20 bg-destructive/5 px-5 py-4 text-sm text-destructive">
+          Your supplier account is currently suspended. Please contact Chemidot support to reactivate your storefront.
+        </div>
+      )}
+
       {/* Edit profile banner */}
       <div className="flex items-center justify-between rounded-xl border bg-muted/30 px-5 py-4">
         <div>
@@ -430,6 +449,44 @@ function SupplierDashboard() {
         <Button variant="outline" size="sm" className="gap-2 shrink-0" onClick={() => navigate("/dashboard/settings")}>
           <Pencil className="w-3.5 h-3.5" /> Open Settings
         </Button>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card className="shadow-sm">
+          <CardContent className="p-5 space-y-1">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Current Plan</p>
+            <p className="text-xl font-bold capitalize">{subscription.supplierPlan ?? "trial"}</p>
+          </CardContent>
+        </Card>
+        <Card className="shadow-sm">
+          <CardContent className="p-5 space-y-1">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Subscription Status</p>
+            <p className="text-xl font-bold capitalize">{subscription.subscriptionStatus ?? "trial"}</p>
+          </CardContent>
+        </Card>
+        <Card className="shadow-sm">
+          <CardContent className="p-5 space-y-1">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Renewal / Trial End</p>
+            <p className="text-sm font-semibold">
+              {subscription.subscriptionRenewalDate
+                ? new Date(subscription.subscriptionRenewalDate).toLocaleDateString()
+                : subscription.trialEndsAt
+                  ? new Date(subscription.trialEndsAt).toLocaleDateString()
+                  : "Not set"}
+            </p>
+          </CardContent>
+        </Card>
+        <Card className="shadow-sm">
+          <CardContent className="p-5 space-y-1">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Catalog Usage</p>
+            <p className="text-sm font-semibold">
+              {stats.totalProducts}{subscription.productLimit ? ` / ${subscription.productLimit}` : " / Unlimited"}
+            </p>
+            {subscription.hasReachedProductLimit && (
+              <p className="text-xs text-amber-600">Upgrade your plan to publish more products.</p>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       {/* KPI row */}

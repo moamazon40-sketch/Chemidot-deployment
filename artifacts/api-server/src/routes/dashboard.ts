@@ -8,6 +8,7 @@ import {
 import { eq, and, sql, desc, gte, inArray, or, ilike, ne } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/auth";
 import { asyncHandler } from "../middlewares/asyncHandler";
+import { hasReachedProductLimit } from "../lib/subscriptions";
 
 const router = Router();
 
@@ -271,6 +272,18 @@ router.get("/dashboard/supplier-stats", requireAuth, requireRole("supplier", "ad
     monthlyRevenue: currentMonthRevenue,
     responseRate: parseFloat(supplier?.responseRate ?? "0"),
     avgResponseTime: supplier?.avgResponseTime ?? "N/A",
+    supplierPlan: supplier?.supplierPlan ?? "trial",
+    subscriptionStatus: supplier?.subscriptionStatus ?? "trial",
+    trialEndsAt: supplier?.trialEndsAt ? supplier.trialEndsAt.toISOString() : null,
+    gracePeriodEndsAt: supplier?.gracePeriodEndsAt ? supplier.gracePeriodEndsAt.toISOString() : null,
+    subscriptionStartedAt: supplier?.subscriptionStartedAt ? supplier.subscriptionStartedAt.toISOString() : null,
+    subscriptionRenewalDate: supplier?.subscriptionRenewalDate ? supplier.subscriptionRenewalDate.toISOString() : null,
+    billingCycle: supplier?.billingCycle ?? "monthly",
+    productLimit: supplier?.productLimit ?? 3,
+    productsPublic: supplier?.productsPublic ?? true,
+    storefrontVisible: supplier?.storefrontVisible ?? true,
+    rfqAccessEnabled: supplier?.rfqAccessEnabled ?? true,
+    hasReachedProductLimit: hasReachedProductLimit(supplier, productCount),
     unreadMessages,
     recentActivity: recentActivity.slice(0, 6),
     revenueByMonth,
@@ -302,8 +315,10 @@ router.get("/dashboard/supplier-stats", requireAuth, requireRole("supplier", "ad
 
 router.get("/dashboard/marketplace-stats", asyncHandler(async (_req, res) => {
   const [products, suppliers, buyers, collectiveActive, totalOrders] = await Promise.all([
-    db.select({ count: sql<number>`cast(count(*) as int)` }).from(productsTable),
-    db.select({ count: sql<number>`cast(count(*) as int)` }).from(suppliersTable),
+    db.select({ count: sql<number>`cast(count(*) as int)` }).from(productsTable)
+      .leftJoin(suppliersTable, eq(suppliersTable.id, productsTable.supplierId))
+      .where(and(eq(suppliersTable.storefrontVisible, true), eq(suppliersTable.productsPublic, true))),
+    db.select({ count: sql<number>`cast(count(*) as int)` }).from(suppliersTable).where(eq(suppliersTable.storefrontVisible, true)),
     db.select({ count: sql<number>`cast(count(*) as int)` }).from(usersTable).where(eq(usersTable.role, "buyer")),
     db.select({ count: sql<number>`cast(count(*) as int)` }).from(collectiveOrdersTable).where(eq(collectiveOrdersTable.status, "open")),
     db.select({ count: sql<number>`cast(count(*) as int)` }).from(ordersTable),

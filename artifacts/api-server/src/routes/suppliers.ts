@@ -15,6 +15,7 @@ import { asyncHandler } from "../middlewares/asyncHandler";
 import path from "path";
 import fs from "fs";
 import multer from "multer";
+import { hasReachedProductLimit } from "../lib/subscriptions";
 
 const router = Router();
 
@@ -79,6 +80,18 @@ function buildSupplier(s: any) {
     avgResponseTime: s.avgResponseTime,
     yearsInBusiness: s.yearsInBusiness,
     rating: null,
+    supplierPlan: s.supplierPlan,
+    subscriptionStatus: s.subscriptionStatus,
+    trialEndsAt: s.trialEndsAt ? s.trialEndsAt.toISOString() : null,
+    gracePeriodEndsAt: s.gracePeriodEndsAt ? s.gracePeriodEndsAt.toISOString() : null,
+    subscriptionStartedAt: s.subscriptionStartedAt ? s.subscriptionStartedAt.toISOString() : null,
+    subscriptionRenewalDate: s.subscriptionRenewalDate ? s.subscriptionRenewalDate.toISOString() : null,
+    billingCycle: s.billingCycle,
+    featuredSupplier: s.featuredSupplier,
+    productLimit: s.productLimit,
+    rfqAccessEnabled: s.rfqAccessEnabled,
+    storefrontVisible: s.storefrontVisible,
+    productsPublic: s.productsPublic,
   };
 }
 
@@ -108,6 +121,9 @@ async function getSupplierProfileByUserId(userId: number) {
     description: supplier.description,
     warehouseLocation: supplier.warehouseLocation,
     commercialRegNumber: supplier.commercialRegNumber,
+    internalAdminNotes: supplier.internalAdminNotes,
+    productCount: products.length,
+    hasReachedProductLimit: hasReachedProductLimit(supplier, products.length),
     brands: brands.map((brand) => ({
       id: brand.id,
       supplierId: brand.supplierId,
@@ -162,7 +178,10 @@ async function getSupplierProfileByUserId(userId: number) {
 
 router.get("/suppliers/featured", asyncHandler(async (_req, res) => {
   const suppliers = await db.select().from(suppliersTable)
-    .where(eq(suppliersTable.featured, true))
+    .where(and(
+      eq(suppliersTable.featuredSupplier, true),
+      eq(suppliersTable.storefrontVisible, true),
+    ))
     .limit(6);
   res.json(suppliers.map(buildSupplier));
 }));
@@ -177,6 +196,7 @@ router.get("/suppliers", optionalAuth, asyncHandler(async (req, res) => {
   if (search) conditions.push(ilike(suppliersTable.companyName, `%${sanitizeSearch(search)}%`));
   if (country) conditions.push(eq(suppliersTable.country, country));
   if (verified === "true") conditions.push(eq(suppliersTable.verified, true));
+  conditions.push(eq(suppliersTable.storefrontVisible, true));
 
   const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
@@ -207,7 +227,10 @@ router.get("/suppliers/profile", requireAuth, asyncHandler(async (req: any, res)
 
 router.get("/suppliers/:id", asyncHandler(async (req, res) => {
   const id = parseInt(String(req.params.id));
-  const [supplier] = await db.select().from(suppliersTable).where(eq(suppliersTable.id, id)).limit(1);
+  const [supplier] = await db.select().from(suppliersTable).where(and(
+    eq(suppliersTable.id, id),
+    eq(suppliersTable.storefrontVisible, true),
+  )).limit(1);
   if (!supplier) {
     res.status(404).json({ message: "Supplier not found" });
     return;
@@ -223,7 +246,7 @@ router.get("/suppliers/:id", asyncHandler(async (req, res) => {
     ...base,
     description: supplier.description,
     warehouseLocation: supplier.warehouseLocation,
-    products: products.map(r => ({
+    products: supplier.productsPublic ? products.map(r => ({
       id: r.products.id,
       name: r.products.name,
       casNumber: r.products.casNumber,
@@ -245,7 +268,7 @@ router.get("/suppliers/:id", asyncHandler(async (req, res) => {
       rating: null,
       reviewCount: 0,
       createdAt: r.products.createdAt.toISOString(),
-    })),
+    })) : [],
   });
 }));
 

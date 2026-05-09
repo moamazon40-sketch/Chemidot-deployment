@@ -5,6 +5,7 @@ import { eq, and, sql, desc, inArray, or, ilike } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/auth";
 import { asyncHandler } from "../middlewares/asyncHandler";
 import { CreateRfqBody, UpdateRfqBody, SubmitQuotationBody, SendNegotiationMessageBody } from "@workspace/api-zod";
+import { canSupplierAccessRfqs, isSupplierSuspended } from "../lib/subscriptions";
 
 const router = Router();
 
@@ -42,7 +43,7 @@ router.get("/rfqs", requireAuth, asyncHandler(async (req, res) => {
     conditions.push(eq(rfqsTable.buyerId, user.id));
   } else if (user.role === "supplier") {
     const [supplier] = await db.select().from(suppliersTable).where(eq(suppliersTable.userId, user.id)).limit(1);
-    if (supplier) {
+    if (supplier && canSupplierAccessRfqs(supplier)) {
       const supplierProducts = await db.select({
         name: productsTable.name,
         casNumber: productsTable.casNumber,
@@ -379,6 +380,10 @@ router.post("/rfqs/:id/quotations", requireAuth, requireRole("supplier", "admin"
   const [supplier] = await db.select().from(suppliersTable).where(eq(suppliersTable.userId, user.id)).limit(1);
   if (!supplier) {
     res.status(403).json({ message: "Supplier profile not found" });
+    return;
+  }
+  if (isSupplierSuspended(supplier) || !canSupplierAccessRfqs(supplier)) {
+    res.status(403).json({ message: "RFQ access is not available for your current supplier plan or subscription status." });
     return;
   }
   
