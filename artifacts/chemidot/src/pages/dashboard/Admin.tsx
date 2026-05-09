@@ -45,8 +45,15 @@ export default function AdminDashboard() {
   const { toast } = useToast();
   const [roleFilter, setRoleFilter] = useState<UserRole | undefined>(undefined);
 
-  const { data: stats, isLoading: statsLoading } = useGetAdminStats();
-  const { data: usersData, isLoading: usersLoading, refetch } = useAdminListUsers({ role: roleFilter, limit: 200 });
+  const isAdmin = user?.role === "admin";
+
+  const { data: stats, isLoading: statsLoading } = useGetAdminStats({
+    query: { enabled: isAdmin },
+  });
+  const { data: usersData, isLoading: usersLoading, refetch } = useAdminListUsers(
+    { role: roleFilter, limit: 200 },
+    { query: { enabled: isAdmin } }
+  );
 
   const updateStatusMutation = useAdminUpdateUserStatus();
   const verifyMutation = useAdminVerifySupplier();
@@ -213,7 +220,7 @@ export default function AdminDashboard() {
     [usersData]
   );
 
-  if (user?.role !== "admin") {
+  if (!isAdmin) {
     return (
       <DashboardLayout>
         <div className="p-12 text-center text-destructive">
