@@ -681,6 +681,8 @@ export const ListRfqsResponse = zod.object({
     zod.object({
       id: zod.number(),
       buyerId: zod.number(),
+      supplierId: zod.number().nullish(),
+      productId: zod.number().nullish(),
       buyerCompanyName: zod.string(),
       productName: zod.string(),
       casNumber: zod.string().nullish(),
@@ -712,6 +714,8 @@ export const CreateRfqBody = zod.object({
   description: zod.string().optional(),
   specifications: zod.string().optional(),
   categoryId: zod.number().optional(),
+  supplierId: zod.number().optional(),
+  productId: zod.number().optional(),
 });
 
 /**

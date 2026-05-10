@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { rfqsTable, usersTable, quotationsTable, suppliersTable, ordersTable, productsTable, categoriesTable, negotiationMessagesTable } from "@workspace/db";
+import { rfqsTable, usersTable, quotationsTable, suppliersTable, ordersTable, productsTable, categoriesTable, negotiationMessagesTable, notificationsTable } from "@workspace/db";
 import { eq, and, sql, desc, inArray, or, ilike } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/auth";
 import { asyncHandler } from "../middlewares/asyncHandler";
@@ -17,6 +17,8 @@ function buildRfq(r: any, quotationCount: number, buyerCompanyName: string) {
   return {
     id: r.id,
     buyerId: r.buyerId,
+    supplierId: r.supplierId,
+    productId: r.productId,
     buyerCompanyName,
     productName: r.productName,
     casNumber: r.casNumber,
@@ -28,6 +30,71 @@ function buildRfq(r: any, quotationCount: number, buyerCompanyName: string) {
     quotationCount,
     createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
   };
+}
+
+async function notifyUser(input: {
+  userId?: number | null;
+  type: "rfq_update" | "new_quotation" | "order_update" | "collective_milestone" | "payment_reminder" | "system";
+  title: string;
+  message: string;
+  relatedId?: number | null;
+  relatedType?: string;
+}) {
+  if (!input.userId) return;
+  await db.insert(notificationsTable).values({
+    userId: input.userId,
+    type: input.type,
+    title: input.title,
+    message: input.message,
+    relatedId: input.relatedId ?? null,
+    relatedType: input.relatedType ?? null,
+    isRead: false,
+  });
+}
+
+async function notifySupplierUsersForRfq(rfq: typeof rfqsTable.$inferSelect) {
+  const targetSuppliers = new Map<number, { userId: number; companyName: string }>();
+
+  if (rfq.supplierId) {
+    const [supplier] = await db.select().from(suppliersTable).where(eq(suppliersTable.id, rfq.supplierId)).limit(1);
+    if (supplier?.userId) targetSuppliers.set(supplier.id, { userId: supplier.userId, companyName: supplier.companyName });
+  }
+
+  if (rfq.productId) {
+    const [row] = await db.select().from(productsTable)
+      .leftJoin(suppliersTable, eq(suppliersTable.id, productsTable.supplierId))
+      .where(eq(productsTable.id, rfq.productId))
+      .limit(1);
+    if (row?.suppliers?.userId) {
+      targetSuppliers.set(row.suppliers.id, { userId: row.suppliers.userId, companyName: row.suppliers.companyName });
+    }
+  }
+
+  if (targetSuppliers.size === 0 && rfq.categoryId) {
+    const rows = await db.select().from(productsTable)
+      .leftJoin(suppliersTable, eq(suppliersTable.id, productsTable.supplierId))
+      .where(and(
+        eq(productsTable.categoryId, rfq.categoryId),
+        eq(suppliersTable.rfqAccessEnabled, true),
+        eq(suppliersTable.storefrontVisible, true),
+      ))
+      .limit(25);
+
+    for (const row of rows) {
+      if (row.suppliers?.userId) {
+        targetSuppliers.set(row.suppliers.id, { userId: row.suppliers.userId, companyName: row.suppliers.companyName });
+      }
+    }
+  }
+
+  await Promise.all(Array.from(targetSuppliers.values()).map((supplier) => notifyUser({
+    userId: supplier.userId,
+    type: "rfq_update",
+    title: "New RFQ received",
+    message: `A buyer requested a quotation for ${rfq.productName}.`,
+    relatedId: rfq.id,
+    relatedType: "rfq",
+  })));
 }
 
 router.get("/rfqs", requireAuth, asyncHandler(async (req, res) => {
@@ -45,28 +112,26 @@ router.get("/rfqs", requireAuth, asyncHandler(async (req, res) => {
     const [supplier] = await db.select().from(suppliersTable).where(eq(suppliersTable.userId, user.id)).limit(1);
     if (supplier && canSupplierAccessRfqs(supplier)) {
       const supplierProducts = await db.select({
+        id: productsTable.id,
         name: productsTable.name,
         casNumber: productsTable.casNumber,
         categoryId: productsTable.categoryId,
       }).from(productsTable).where(eq(productsTable.supplierId, supplier.id));
 
-      if (supplierProducts.length > 0) {
-        const matchConditions: any[] = [];
+      const matchConditions: any[] = [eq(rfqsTable.supplierId, supplier.id)];
 
+      if (supplierProducts.length > 0) {
+        const productIds = supplierProducts.map(p => p.id).filter(Boolean);
         const categoryIds = [...new Set(supplierProducts.map(p => p.categoryId).filter(Boolean))];
+        if (productIds.length > 0) {
+          matchConditions.push(inArray(rfqsTable.productId, productIds as number[]));
+        }
         if (categoryIds.length > 0) {
           matchConditions.push(inArray(rfqsTable.categoryId, categoryIds as number[]));
         }
 
-        // Geography matching - filter by supplier's country
-        const supplierCountry = supplier.country;
-        if (supplierCountry) {
-          matchConditions.push(eq(rfqsTable.deliveryDestination, supplierCountry));
-        }
-
         for (const p of supplierProducts) {
           if (p.name) {
-            // Use parameterized query to prevent SQL injection
             const escapedName = p.name.replace(/[%_\\]/g, '\\$&');
             matchConditions.push(ilike(rfqsTable.productName, `%${escapedName}%`));
           }
@@ -74,41 +139,9 @@ router.get("/rfqs", requireAuth, asyncHandler(async (req, res) => {
             matchConditions.push(eq(rfqsTable.casNumber, p.casNumber));
           }
         }
-
-        if (matchConditions.length > 0) {
-          // Combine category, geography, and product matching with proper logic
-          const categoryConditions = matchConditions.filter(cond => 
-            cond.toString().includes('categoryId')
-          );
-          const geographyConditions = matchConditions.filter(cond => 
-            cond.toString().includes('deliveryDestination')
-          );
-          const productMatchConditions = matchConditions.filter(cond => 
-            cond.toString().includes('productName') || cond.toString().includes('casNumber')
-          );
-          
-          // Build proper query: (category AND geography AND (product OR CAS))
-          const allConditions: any[] = [];
-          
-          if (categoryConditions.length > 0) {
-            allConditions.push(and(...categoryConditions));
-          }
-          
-          if (geographyConditions.length > 0) {
-            allConditions.push(and(...geographyConditions));
-          }
-          
-          if (productMatchConditions.length > 0) {
-            allConditions.push(or(...productMatchConditions));
-          }
-          
-          if (allConditions.length > 0) {
-            conditions.push(and(...allConditions));
-          }
-        }
-      } else {
-        conditions.push(sql`false`);
       }
+
+      conditions.push(or(...matchConditions));
     } else {
       conditions.push(sql`false`);
     }
@@ -185,20 +218,47 @@ router.post("/rfqs", requireAuth, requireRole("buyer", "admin"), asyncHandler(as
     res.status(400).json({ message: "Delivery destination is required" });
     return;
   }
+
+  let linkedProduct: typeof productsTable.$inferSelect | undefined;
+  let linkedSupplier: typeof suppliersTable.$inferSelect | undefined;
+
+  if (body.productId) {
+    const [row] = await db.select().from(productsTable)
+      .leftJoin(suppliersTable, eq(suppliersTable.id, productsTable.supplierId))
+      .where(eq(productsTable.id, body.productId))
+      .limit(1);
+    if (!row?.products || !row.suppliers) {
+      res.status(400).json({ message: "Selected product could not be found" });
+      return;
+    }
+    linkedProduct = row.products;
+    linkedSupplier = row.suppliers;
+  } else if (body.supplierId) {
+    const [supplier] = await db.select().from(suppliersTable).where(eq(suppliersTable.id, body.supplierId)).limit(1);
+    if (!supplier) {
+      res.status(400).json({ message: "Selected supplier could not be found" });
+      return;
+    }
+    linkedSupplier = supplier;
+  }
   
   const [rfq] = await db.insert(rfqsTable).values({
     buyerId: user.id,
-    productName: body.productName.trim(),
-    casNumber: body.casNumber?.trim() || null,
+    supplierId: linkedSupplier?.id ?? body.supplierId ?? null,
+    productId: linkedProduct?.id ?? body.productId ?? null,
+    productName: (linkedProduct?.name ?? body.productName).trim(),
+    casNumber: linkedProduct?.casNumber ?? body.casNumber?.trim() ?? null,
     quantity: String(body.quantity),
     unit: body.unit,
     deliveryDestination: body.deliveryDestination.trim(),
     deliveryDeadline,
     description: body.description?.trim() || null,
     specifications: body.specifications?.trim() || null,
-    categoryId: body.categoryId || null,
+    categoryId: linkedProduct?.categoryId ?? body.categoryId ?? null,
     status: "active",
   }).returning();
+
+  await notifySupplierUsersForRfq(rfq);
 
   res.status(201).json(buildRfq(rfq, 0, user.companyName));
 }));
@@ -420,6 +480,15 @@ router.post("/rfqs/:id/quotations", requireAuth, requireRole("supplier", "admin"
     status: "pending",
   }).returning();
 
+  await notifyUser({
+    userId: rfq.buyerId,
+    type: "new_quotation",
+    title: "New quotation received",
+    message: `${supplier.companyName} submitted a quotation for ${rfq.productName}.`,
+    relatedId: rfq.id,
+    relatedType: "rfq",
+  });
+
   res.status(201).json({
     id: quotation.id,
     rfqId: quotation.rfqId,
@@ -503,6 +572,15 @@ router.post("/rfqs/:id/quotations/:qid/accept", requireAuth, asyncHandler(async 
     return { order, quotation, rfq };
   });
 
+  await notifyUser({
+    userId: result.quotation.suppliers?.userId,
+    type: "rfq_update",
+    title: "Quotation accepted",
+    message: `Your quotation for ${result.rfq.productName} was accepted.`,
+    relatedId: result.rfq.id,
+    relatedType: "rfq",
+  });
+
   res.status(201).json({
     id: result.order.id,
     buyerId: result.order.buyerId,
@@ -539,6 +617,15 @@ router.post("/rfqs/:id/quotations/:qid/reject", requireAuth, asyncHandler(async 
   }
 
   await db.update(quotationsTable).set({ status: "rejected", updatedAt: new Date() }).where(eq(quotationsTable.id, qid));
+  const [supplier] = await db.select().from(suppliersTable).where(eq(suppliersTable.id, quotation.supplierId)).limit(1);
+  await notifyUser({
+    userId: supplier?.userId,
+    type: "rfq_update",
+    title: "Quotation rejected",
+    message: `Your quotation for ${rfq.productName} was rejected.`,
+    relatedId: rfq.id,
+    relatedType: "rfq",
+  });
   res.json({ message: "Quotation rejected" });
 }));
 
@@ -695,6 +782,15 @@ router.post("/rfqs/:id/quotations/:qid/negotiations", requireAuth, asyncHandler(
       updatedAt: new Date(),
     }).where(eq(quotationsTable.id, qid));
   }
+
+  await notifyUser({
+    userId: isBuyer ? supplier?.userId : rfq.buyerId,
+    type: "rfq_update",
+    title: body.type === "counter_offer" ? "Counter offer received" : "New RFQ message",
+    message: `${user.firstName} ${user.lastName} replied on ${rfq.productName}.`,
+    relatedId: rfq.id,
+    relatedType: "rfq",
+  });
 
   res.status(201).json({
     id: msg.id,

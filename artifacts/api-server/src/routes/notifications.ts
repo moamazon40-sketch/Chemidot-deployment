@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { notificationsTable } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/auth";
 import { asyncHandler } from "../middlewares/asyncHandler";
 
@@ -16,7 +16,7 @@ router.get("/notifications", requireAuth, asyncHandler(async (req, res) => {
 
   const notifications = await db.select().from(notificationsTable)
     .where(and(...conditions))
-    .orderBy(notificationsTable.createdAt)
+    .orderBy(desc(notificationsTable.createdAt))
     .limit(50);
 
   res.json(notifications.map(n => ({

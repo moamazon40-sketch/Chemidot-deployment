@@ -49,7 +49,7 @@ type NavGroup = {
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function buildNavGroups(role: string, t: Record<string, any>, unreadCount: number): NavGroup[] {
+function buildNavGroups(role: string, t: Record<string, any>, unreadCount: number, rfqUnreadCount: number): NavGroup[] {
   if (role === "admin") {
     return [
       {
@@ -76,7 +76,7 @@ function buildNavGroups(role: string, t: Record<string, any>, unreadCount: numbe
         items: [
           { href: "/dashboard", label: t.overview, icon: LayoutDashboard },
           { href: "/marketplace", label: t.marketplace, icon: Store },
-          { href: "/dashboard/rfqs", label: t.rfqsQuotes, icon: FileText },
+          { href: "/dashboard/rfqs", label: t.rfqsQuotes, icon: FileText, badge: rfqUnreadCount },
           { href: "/dashboard/orders", label: t.orders, icon: Package },
           { href: "/dashboard/collective", label: t.collectiveOrdersSidebar, icon: Users },
         ],
@@ -98,7 +98,7 @@ function buildNavGroups(role: string, t: Record<string, any>, unreadCount: numbe
         items: [
           { href: "/dashboard", label: t.overview, icon: LayoutDashboard },
           { href: "/dashboard/products", label: t.myProducts, icon: Store },
-          { href: "/dashboard/rfqs", label: t.rfqsQuotes, icon: FileText },
+          { href: "/dashboard/rfqs", label: t.rfqsQuotes, icon: FileText, badge: rfqUnreadCount },
           { href: "/dashboard/orders", label: t.orders, icon: ShoppingCart },
         ],
       },
@@ -267,6 +267,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     { query: { enabled: !!user } as any }
   );
   const unreadCount = notifs?.length ?? 0;
+  const rfqUnreadCount = notifs?.filter((n: any) => n.relatedType === "rfq").length ?? 0;
 
   if (!user) {
     return (
@@ -295,7 +296,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     );
   }
 
-  const groups = buildNavGroups(user.role, t, unreadCount);
+  const groups = buildNavGroups(user.role, t, unreadCount, rfqUnreadCount);
 
   return (
     <SidebarProvider defaultOpen={true}>

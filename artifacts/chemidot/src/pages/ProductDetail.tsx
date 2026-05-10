@@ -294,6 +294,11 @@ export default function ProductDetail() {
     const qty = (document.getElementById("qty") as HTMLInputElement)?.value || "";
     const params = new URLSearchParams();
     params.set("product", product.name);
+    params.set("productId", String(product.id));
+    params.set("supplierId", String(product.supplierId));
+    if (product.categoryId) params.set("categoryId", String(product.categoryId));
+    if (product.casNumber) params.set("cas", product.casNumber);
+    if (product.moqUnit) params.set("unit", product.moqUnit);
     if (qty) params.set("qty", qty);
     navigate(`/dashboard/rfqs?${params.toString()}`);
   };

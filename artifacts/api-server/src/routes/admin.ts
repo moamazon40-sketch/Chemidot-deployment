@@ -4,6 +4,7 @@ import {
   adminAuditLogsTable,
   categoriesTable,
   collectiveOrdersTable,
+  notificationsTable,
   ordersTable,
   productsTable,
   rfqsTable,
@@ -379,6 +380,32 @@ router.patch("/admin/rfqs/:id/status", requireAuth, requireRole("admin"), asyncH
     res.status(404).json({ message: "RFQ not found" });
     return;
   }
+  const notifications = [
+    {
+      userId: updated.buyerId,
+      type: "rfq_update" as const,
+      title: "RFQ status updated",
+      message: `Your RFQ for ${updated.productName} is now ${updated.status}.`,
+      relatedId: updated.id,
+      relatedType: "rfq",
+      isRead: false,
+    },
+  ];
+  if (updated.supplierId) {
+    const [supplier] = await db.select().from(suppliersTable).where(eq(suppliersTable.id, updated.supplierId)).limit(1);
+    if (supplier?.userId) {
+      notifications.push({
+        userId: supplier.userId,
+        type: "rfq_update",
+        title: "RFQ status updated",
+        message: `RFQ for ${updated.productName} is now ${updated.status}.`,
+        relatedId: updated.id,
+        relatedType: "rfq",
+        isRead: false,
+      });
+    }
+  }
+  await db.insert(notificationsTable).values(notifications);
   res.json(updated);
 }));
 

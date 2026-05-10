@@ -51,12 +51,24 @@ function CreateRfqDialog({ onCreated, defaultProduct = "", defaultQty = "" }: {
     description: "",
     specifications: "",
     categoryId: "",
+    supplierId: "",
+    productId: "",
   });
 
   // Sync if defaultProduct changes (e.g. first render)
   useEffect(() => {
     if (defaultProduct) {
-      setForm(p => ({ ...p, productName: defaultProduct, quantity: defaultQty || p.quantity }));
+      const params = new URLSearchParams(window.location.search);
+      setForm(p => ({
+        ...p,
+        productName: defaultProduct,
+        quantity: defaultQty || p.quantity,
+        casNumber: params.get("cas") || p.casNumber,
+        unit: params.get("unit") || p.unit,
+        categoryId: params.get("categoryId") || p.categoryId,
+        supplierId: params.get("supplierId") || p.supplierId,
+        productId: params.get("productId") || p.productId,
+      }));
       setOpen(true);
     }
   }, [defaultProduct, defaultQty]);
@@ -82,12 +94,14 @@ function CreateRfqDialog({ onCreated, defaultProduct = "", defaultQty = "" }: {
         description: form.description || undefined,
         specifications: form.specifications || undefined,
         categoryId: form.categoryId ? parseInt(form.categoryId) : undefined,
+        supplierId: form.supplierId ? parseInt(form.supplierId) : undefined,
+        productId: form.productId ? parseInt(form.productId) : undefined,
       },
     }, {
       onSuccess: () => {
         toast({ title: "RFQ submitted!", description: "Matched suppliers will be notified." });
         setOpen(false);
-        setForm({ productName: "", casNumber: "", quantity: "", unit: "MT", deliveryDestination: "", deliveryDeadline: "", description: "", specifications: "", categoryId: "" });
+        setForm({ productName: "", casNumber: "", quantity: "", unit: "MT", deliveryDestination: "", deliveryDeadline: "", description: "", specifications: "", categoryId: "", supplierId: "", productId: "" });
         onCreated();
       },
       onError: () => toast({ title: "Failed to create RFQ", variant: "destructive" }),

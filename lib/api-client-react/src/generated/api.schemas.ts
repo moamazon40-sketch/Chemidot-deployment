@@ -255,6 +255,8 @@ export const RfqStatus = {
 export interface Rfq {
   id: number;
   buyerId: number;
+  supplierId?: number | null;
+  productId?: number | null;
   buyerCompanyName: string;
   productName: string;
   casNumber?: string | null;
@@ -317,6 +319,8 @@ export interface CreateRfqBody {
   description?: string;
   specifications?: string;
   categoryId?: number;
+  supplierId?: number;
+  productId?: number;
 }
 
 export interface UpdateRfqBody {

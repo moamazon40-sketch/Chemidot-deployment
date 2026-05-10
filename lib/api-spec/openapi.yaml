@@ -1642,10 +1642,16 @@ components:
       properties:
         id:
           type: integer
-        buyerId:
-          type: integer
-        buyerCompanyName:
-          type: string
+          buyerId:
+            type: integer
+          supplierId:
+            type: integer
+            nullable: true
+          productId:
+            type: integer
+            nullable: true
+          buyerCompanyName:
+            type: string
         productName:
           type: string
         casNumber:
@@ -1721,9 +1727,13 @@ components:
           type: string
         specifications:
           type: string
-        categoryId:
-          type: integer
-      required: [productName, quantity, unit, deliveryDestination, deliveryDeadline]
+          categoryId:
+            type: integer
+          supplierId:
+            type: integer
+          productId:
+            type: integer
+        required: [productName, quantity, unit, deliveryDestination, deliveryDeadline]
 
     UpdateRfqBody:
       type: object
