@@ -110,7 +110,7 @@ router.get("/rfqs", requireAuth, asyncHandler(async (req, res) => {
     conditions.push(eq(rfqsTable.buyerId, user.id));
   } else if (user.role === "supplier") {
     const [supplier] = await db.select().from(suppliersTable).where(eq(suppliersTable.userId, user.id)).limit(1);
-    if (supplier && canSupplierAccessRfqs(supplier)) {
+    if (supplier && !isSupplierSuspended(supplier)) {
       const supplierProducts = await db.select({
         id: productsTable.id,
         name: productsTable.name,
@@ -122,21 +122,26 @@ router.get("/rfqs", requireAuth, asyncHandler(async (req, res) => {
 
       if (supplierProducts.length > 0) {
         const productIds = supplierProducts.map(p => p.id).filter(Boolean);
-        const categoryIds = [...new Set(supplierProducts.map(p => p.categoryId).filter(Boolean))];
         if (productIds.length > 0) {
           matchConditions.push(inArray(rfqsTable.productId, productIds as number[]));
         }
-        if (categoryIds.length > 0) {
-          matchConditions.push(inArray(rfqsTable.categoryId, categoryIds as number[]));
-        }
 
-        for (const p of supplierProducts) {
-          if (p.name) {
-            const escapedName = p.name.replace(/[%_\\]/g, '\\$&');
-            matchConditions.push(ilike(rfqsTable.productName, `%${escapedName}%`));
+        // Plan-gated broad matching is only for marketplace RFQs that were not sent
+        // to this supplier directly. Direct product/storefront RFQs always show.
+        if (canSupplierAccessRfqs(supplier)) {
+          const categoryIds = [...new Set(supplierProducts.map(p => p.categoryId).filter(Boolean))];
+          if (categoryIds.length > 0) {
+            matchConditions.push(inArray(rfqsTable.categoryId, categoryIds as number[]));
           }
-          if (p.casNumber) {
-            matchConditions.push(eq(rfqsTable.casNumber, p.casNumber));
+
+          for (const p of supplierProducts) {
+            if (p.name) {
+              const escapedName = p.name.replace(/[%_\\]/g, '\\$&');
+              matchConditions.push(ilike(rfqsTable.productName, `%${escapedName}%`));
+            }
+            if (p.casNumber) {
+              matchConditions.push(eq(rfqsTable.casNumber, p.casNumber));
+            }
           }
         }
       }
@@ -442,14 +447,24 @@ router.post("/rfqs/:id/quotations", requireAuth, requireRole("supplier", "admin"
     res.status(403).json({ message: "Supplier profile not found" });
     return;
   }
-  if (isSupplierSuspended(supplier) || !canSupplierAccessRfqs(supplier)) {
-    res.status(403).json({ message: "RFQ access is not available for your current supplier plan or subscription status." });
-    return;
-  }
   
   const [rfq] = await db.select().from(rfqsTable).where(eq(rfqsTable.id, rfqId)).limit(1);
   if (!rfq) {
     res.status(404).json({ message: "RFQ not found" });
+    return;
+  }
+
+  let isDirectRfqForSupplier = rfq.supplierId === supplier.id;
+  if (!isDirectRfqForSupplier && rfq.productId) {
+    const [linkedProduct] = await db.select({ supplierId: productsTable.supplierId })
+      .from(productsTable)
+      .where(eq(productsTable.id, rfq.productId))
+      .limit(1);
+    isDirectRfqForSupplier = linkedProduct?.supplierId === supplier.id;
+  }
+
+  if (isSupplierSuspended(supplier) || (!isDirectRfqForSupplier && !canSupplierAccessRfqs(supplier))) {
+    res.status(403).json({ message: "RFQ access is not available for your current supplier plan or subscription status." });
     return;
   }
   
