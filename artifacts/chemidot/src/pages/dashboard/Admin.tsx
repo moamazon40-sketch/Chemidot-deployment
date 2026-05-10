@@ -268,6 +268,12 @@ export default function AdminDashboard() {
   const [supplierFeaturedFilter, setSupplierFeaturedFilter] = useState("all");
   const isAdmin = user?.role === "admin";
 
+  useEffect(() => {
+    const tab = new URLSearchParams(window.location.search).get("tab");
+    const validTabs = ["users", "suppliers", "products", "orders", "rfqs", "collective", "categories"];
+    if (tab && validTabs.includes(tab)) setActiveTab(tab);
+  }, []);
+
   const loadAdminData = async () => {
     if (!isAdmin) return;
     setLoading(true);

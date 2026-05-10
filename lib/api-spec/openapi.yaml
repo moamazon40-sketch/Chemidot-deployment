@@ -1043,6 +1043,25 @@ paths:
               schema:
                 $ref: "#/components/schemas/MessageResponse"
 
+  /notifications/{id}/read:
+    post:
+      operationId: markNotificationRead
+      tags: [notifications]
+      summary: Mark one notification as read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Notification marked read
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Notification"
+
   /dashboard/buyer-stats:
     get:
       operationId: getBuyerStats
@@ -2193,6 +2212,9 @@ components:
           type: integer
           nullable: true
         relatedType:
+          type: string
+          nullable: true
+        targetUrl:
           type: string
           nullable: true
         createdAt:

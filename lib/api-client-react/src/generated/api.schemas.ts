@@ -610,6 +610,7 @@ export interface Notification {
   isRead: boolean;
   relatedId?: number | null;
   relatedType?: string | null;
+  targetUrl?: string | null;
   createdAt: string;
 }
 

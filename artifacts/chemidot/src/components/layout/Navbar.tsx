@@ -18,10 +18,14 @@ import { useListNotifications, useMarkAllNotificationsRead } from "@workspace/ap
 import { useLocation as useWouterLocation } from "wouter";
 import { useLanguage } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { getStoredToken } from "@/lib/storage";
 import logoImage from "@assets/Copy_of_Untitled_Design_(1)_1777886080670.png";
 
 function NotificationsBell() {
   const { t } = useLanguage();
+  const { user } = useAuth();
+  const [, navigate] = useWouterLocation();
+  const [open, setOpen] = useState(false);
   const { data: notifications, refetch } = useListNotifications({ unreadOnly: true });
   const markAllRead = useMarkAllNotificationsRead();
   const unreadCount = notifications?.length ?? 0;
@@ -30,14 +34,38 @@ function NotificationsBell() {
     markAllRead.mutate(undefined, { onSuccess: () => refetch() });
   };
 
+  const fallbackHref = () => (user?.role === "admin" ? "/admin" : "/dashboard");
+
   const notificationHref = (n: any) => {
-    if (n.relatedType === "order") return "/dashboard/orders";
-    if (n.relatedType === "rfq") return "/dashboard/rfqs";
-    return "/dashboard";
+    if (n.targetUrl) return n.targetUrl;
+    if (n.relatedType === "rfq" && n.relatedId) {
+      return user?.role === "admin" ? "/admin?tab=rfqs" : `/dashboard/rfqs/${n.relatedId}`;
+    }
+    if (n.relatedType === "order" && n.relatedId) {
+      return user?.role === "admin" ? "/admin?tab=orders" : `/dashboard/orders?orderId=${n.relatedId}`;
+    }
+    return fallbackHref();
+  };
+
+  const handleNotificationClick = async (n: any) => {
+    const target = notificationHref(n);
+    setOpen(false);
+    if (!n.isRead) {
+      try {
+        await fetch(`/api/notifications/${n.id}/read`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${getStoredToken() ?? ""}` },
+        });
+        await refetch();
+      } catch {
+        // Navigation should still happen even if the read marker fails.
+      }
+    }
+    navigate(target || fallbackHref());
   };
 
   return (
-    <DropdownMenu>
+    <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon" className="relative">
           <Bell className="h-4 w-4" />
@@ -64,14 +92,22 @@ function NotificationsBell() {
           </div>
         ) : (
           notifications.slice(0, 8).map((n: any) => (
-            <DropdownMenuItem key={n.id} asChild>
-              <Link href={notificationHref(n)} className="flex flex-col items-start gap-0.5 py-2.5 cursor-pointer">
+            <DropdownMenuItem
+              key={n.id}
+              onSelect={(event) => {
+                event.preventDefault();
+                void handleNotificationClick(n);
+              }}
+              className={cn(
+                "flex flex-col items-start gap-0.5 py-2.5 cursor-pointer",
+                !n.isRead && "bg-primary/5"
+              )}
+            >
                 <span className="font-medium text-sm">{n.title}</span>
                 <span className="text-xs text-muted-foreground line-clamp-2">{n.message}</span>
                 <span className="text-[10px] text-muted-foreground/60 mt-0.5">
                   {new Date(n.createdAt).toLocaleDateString()}
                 </span>
-              </Link>
             </DropdownMenuItem>
           ))
         )}

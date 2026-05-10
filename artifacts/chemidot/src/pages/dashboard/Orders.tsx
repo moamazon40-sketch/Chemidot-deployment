@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { statusColor, formatDate, formatCurrency } from "@/lib/formatters";
 import { useToast } from "@/hooks/use-toast";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const STATUS_STEPS = ["confirmed", "processing", "shipped", "delivered"];
 
@@ -410,6 +410,11 @@ export default function Orders() {
   const { data, isLoading, refetch } = useListOrders();
   const [statusFilter, setStatusFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
+
+  useEffect(() => {
+    const orderId = new URLSearchParams(window.location.search).get("orderId");
+    if (orderId) setSearchTerm(orderId);
+  }, []);
 
   const allOrders = data?.orders ?? [];
   const filtered = allOrders.filter(o => {

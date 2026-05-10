@@ -1401,6 +1401,7 @@ export const ListNotificationsResponseItem = zod.object({
   isRead: zod.boolean(),
   relatedId: zod.number().nullish(),
   relatedType: zod.string().nullish(),
+  targetUrl: zod.string().nullish(),
   createdAt: zod.string(),
 });
 export const ListNotificationsResponse = zod.array(
