@@ -5,7 +5,7 @@ import { eq, and, sql, desc, inArray, or, ilike } from "drizzle-orm";
 import { requireAuth, requireRole } from "../middlewares/auth";
 import { asyncHandler } from "../middlewares/asyncHandler";
 import { CreateRfqBody, UpdateRfqBody, SubmitQuotationBody, SendNegotiationMessageBody } from "@workspace/api-zod";
-import { canSupplierAccessRfqs, isSupplierSuspended } from "../lib/subscriptions";
+import { canSupplierAccessRfqs, getSupplierRfqListLimit, isSupplierSuspended } from "../lib/subscriptions";
 
 const router = Router();
 
@@ -101,8 +101,8 @@ router.get("/rfqs", requireAuth, asyncHandler(async (req, res) => {
   const user = (req as any).user;
   const { status, page = "1", limit = "20" } = req.query as any;
   const pageNum = Math.max(1, parseInt(page));
-  const limitNum = Math.min(50, parseInt(limit));
-  const offset = (pageNum - 1) * limitNum;
+  let limitNum = Math.min(50, parseInt(limit));
+  let visibleTotalCap: number | null = null;
 
   const conditions: any[] = [];
 
@@ -111,6 +111,11 @@ router.get("/rfqs", requireAuth, asyncHandler(async (req, res) => {
   } else if (user.role === "supplier") {
     const [supplier] = await db.select().from(suppliersTable).where(eq(suppliersTable.userId, user.id)).limit(1);
     if (supplier && !isSupplierSuspended(supplier)) {
+      visibleTotalCap = getSupplierRfqListLimit(supplier);
+      if (visibleTotalCap !== null) {
+        limitNum = Math.min(limitNum, visibleTotalCap);
+      }
+
       const supplierProducts = await db.select({
         id: productsTable.id,
         name: productsTable.name,
@@ -157,6 +162,7 @@ router.get("/rfqs", requireAuth, asyncHandler(async (req, res) => {
   if (status) conditions.push(eq(rfqsTable.status, status));
 
   const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+  const offset = (pageNum - 1) * limitNum;
 
   const [rows, countResult] = await Promise.all([
     db.select().from(rfqsTable)
@@ -183,7 +189,8 @@ router.get("/rfqs", requireAuth, asyncHandler(async (req, res) => {
     }
   }
 
-  const total = countResult[0]?.count ?? 0;
+  const totalBeforeCap = countResult[0]?.count ?? 0;
+  const total = visibleTotalCap === null ? totalBeforeCap : Math.min(totalBeforeCap, visibleTotalCap);
   res.json({
     rfqs: rows.map(r => buildRfq(r.rfqs, quotCounts[r.rfqs.id] ?? 0, r.users?.companyName ?? "")),
     total,

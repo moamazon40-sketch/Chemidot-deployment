@@ -52,7 +52,7 @@ const PRICING_PLANS = [
     cta: "Start Free Trial",
     href: "/auth/register",
     featured: false,
-    features: ["Up to 3 products", "Basic supplier storefront", "Basic SDS/TDS support", "Limited RFQ visibility", "No premium exposure"],
+    features: ["Up to 3 products", "Basic supplier storefront", "Basic SDS/TDS support", "Up to 10 RFQs", "No premium exposure"],
   },
   {
     name: "Starter",

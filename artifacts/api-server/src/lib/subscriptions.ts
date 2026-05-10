@@ -4,7 +4,8 @@ import { eq } from "drizzle-orm";
 export const PLAN_DEFAULTS = {
   trial: {
     productLimit: 3,
-    rfqAccessEnabled: false,
+    rfqAccessEnabled: true,
+    rfqLimit: 10,
     featuredSupplier: false,
     billingCycle: "monthly" as const,
   },
@@ -155,7 +156,13 @@ export function isSupplierSuspended(supplier: Supplier | null | undefined) {
 export function canSupplierAccessRfqs(supplier: Supplier | null | undefined) {
   if (!supplier) return false;
   if (isSupplierSuspended(supplier)) return false;
+  if (supplier.supplierPlan === "trial") return true;
   return supplier.rfqAccessEnabled;
+}
+
+export function getSupplierRfqListLimit(supplier: Supplier | null | undefined) {
+  if (!supplier) return null;
+  return supplier.supplierPlan === "trial" ? PLAN_DEFAULTS.trial.rfqLimit : null;
 }
 
 export function hasReachedProductLimit(supplier: Supplier | null | undefined, productCount: number) {
