@@ -888,7 +888,7 @@ paths:
           in: query
           schema:
             type: string
-            enum: [pending, confirmed, processing, shipped, delivered, cancelled]
+            enum: [pending, confirmed, processing, shipped, delivered, completed, cancelled]
         - name: page
           in: query
           schema:
@@ -1852,7 +1852,7 @@ components:
       properties:
         status:
           type: string
-          enum: [confirmed, processing, shipped, delivered, cancelled]
+          enum: [confirmed, processing, shipped, delivered, completed, cancelled]
         trackingNumber:
           type: string
         estimatedDelivery:
@@ -2026,11 +2026,37 @@ components:
           type: string
         status:
           type: string
-          enum: [pending, confirmed, processing, shipped, delivered, cancelled]
+          enum: [pending, confirmed, processing, shipped, delivered, completed, cancelled]
         trackingNumber:
           type: string
           nullable: true
         estimatedDelivery:
+          type: string
+          nullable: true
+        dealValue:
+          type: number
+          nullable: true
+        dealCurrency:
+          type: string
+          nullable: true
+        successFeeRate:
+          type: number
+          nullable: true
+        successFeeAmount:
+          type: number
+          nullable: true
+        successFeePayer:
+          type: string
+          enum: [supplier]
+          nullable: true
+        successFeeStatus:
+          type: string
+          enum: [pending, invoiced, paid, waived]
+          nullable: true
+        successFeeNotes:
+          type: string
+          nullable: true
+        successFeeMarkedAt:
           type: string
           nullable: true
         createdAt:

@@ -5,7 +5,9 @@ import { usersTable } from "./users";
 import { suppliersTable } from "./suppliers";
 import { productsTable } from "./products";
 
-export const orderStatusEnum = pgEnum("order_status", ["pending", "confirmed", "processing", "shipped", "delivered", "cancelled"]);
+export const orderStatusEnum = pgEnum("order_status", ["pending", "confirmed", "processing", "shipped", "delivered", "completed", "cancelled"]);
+export const successFeeStatusEnum = pgEnum("success_fee_status", ["pending", "invoiced", "paid", "waived"]);
+export const successFeePayerEnum = pgEnum("success_fee_payer", ["supplier"]);
 
 export const ordersTable = pgTable("orders", {
   id: serial("id").primaryKey(),
@@ -23,6 +25,14 @@ export const ordersTable = pgTable("orders", {
   trackingNumber: text("tracking_number"),
   estimatedDelivery: timestamp("estimated_delivery"),
   deliveryAddress: text("delivery_address"),
+  dealValue: numeric("deal_value", { precision: 14, scale: 2 }),
+  dealCurrency: text("deal_currency"),
+  successFeeRate: numeric("success_fee_rate", { precision: 5, scale: 4 }).notNull().default("0.0200"),
+  successFeeAmount: numeric("success_fee_amount", { precision: 14, scale: 2 }),
+  successFeePayer: successFeePayerEnum("success_fee_payer").notNull().default("supplier"),
+  successFeeStatus: successFeeStatusEnum("success_fee_status"),
+  successFeeNotes: text("success_fee_notes"),
+  successFeeMarkedAt: timestamp("success_fee_marked_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => [

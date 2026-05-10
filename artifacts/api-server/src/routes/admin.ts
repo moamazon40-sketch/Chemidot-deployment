@@ -53,6 +53,52 @@ const supplierSubscriptionPatchSchema = z.object({
     "update_notes",
   ]).optional(),
 });
+const orderStatusSchema = z.enum(["pending", "confirmed", "processing", "shipped", "delivered", "completed", "cancelled"]);
+const successFeeStatusSchema = z.enum(["pending", "invoiced", "paid", "waived"]);
+const orderStatusPatchSchema = z.object({
+  status: orderStatusSchema,
+  dealValue: z.number().positive().optional(),
+  dealCurrency: z.string().min(1).optional(),
+});
+const successFeePatchSchema = z.object({
+  dealValue: z.number().positive().optional(),
+  dealCurrency: z.string().min(1).optional(),
+  successFeeStatus: successFeeStatusSchema.optional(),
+  successFeeNotes: z.string().nullable().optional(),
+});
+
+const SUCCESS_FEE_RATE = 0.02;
+
+function calculateSuccessFeeAmount(dealValue: number) {
+  return Math.round(dealValue * SUCCESS_FEE_RATE * 100) / 100;
+}
+
+function buildSuccessFeePatch(order: typeof ordersTable.$inferSelect, input: {
+  dealValue?: number;
+  dealCurrency?: string;
+  successFeeStatus?: "pending" | "invoiced" | "paid" | "waived";
+  successFeeNotes?: string | null;
+  markClosed?: boolean;
+}) {
+  const dealValue = input.dealValue ?? (order.dealValue ? Number(order.dealValue) : Number(order.totalPrice));
+  const dealCurrency = input.dealCurrency ?? order.dealCurrency ?? order.currency;
+  const patch: Record<string, unknown> = {
+    dealValue: String(dealValue),
+    dealCurrency,
+    successFeeRate: SUCCESS_FEE_RATE.toFixed(4),
+    successFeeAmount: String(calculateSuccessFeeAmount(dealValue)),
+    successFeePayer: "supplier",
+    updatedAt: new Date(),
+  };
+
+  if (input.successFeeStatus !== undefined) patch.successFeeStatus = input.successFeeStatus;
+  if (input.successFeeNotes !== undefined) patch.successFeeNotes = input.successFeeNotes;
+  if (input.markClosed) {
+    patch.successFeeStatus = order.successFeeStatus ?? "pending";
+    patch.successFeeMarkedAt = new Date();
+  }
+  return patch;
+}
 
 function parseDateOrNull(value?: string | null) {
   if (value === undefined) return undefined;
@@ -95,6 +141,41 @@ async function buildSupplierAdminRow(supplier: typeof suppliersTable.$inferSelec
       action: item.action,
       createdAt: toIso(item.createdAt),
     })),
+  };
+}
+
+async function buildOrderAdminRow(order: typeof ordersTable.$inferSelect, supplier?: typeof suppliersTable.$inferSelect | null) {
+  const [buyer] = await db.select({
+    id: usersTable.id,
+    email: usersTable.email,
+    companyName: usersTable.companyName,
+  }).from(usersTable).where(eq(usersTable.id, order.buyerId)).limit(1);
+
+  return {
+    id: order.id,
+    buyerId: order.buyerId,
+    supplierId: order.supplierId,
+    productId: order.productId,
+    rfqId: order.rfqId,
+    quotationId: order.quotationId,
+    productName: order.productName,
+    quantity: order.quantity,
+    unit: order.unit,
+    totalPrice: order.totalPrice,
+    currency: order.currency,
+    status: order.status,
+    deliveryAddress: order.deliveryAddress,
+    dealValue: order.dealValue,
+    dealCurrency: order.dealCurrency ?? order.currency,
+    successFeeRate: order.successFeeRate,
+    successFeeAmount: order.successFeeAmount,
+    successFeePayer: order.successFeePayer,
+    successFeeStatus: order.successFeeStatus,
+    successFeeNotes: order.successFeeNotes,
+    successFeeMarkedAt: toIso(order.successFeeMarkedAt),
+    buyer: buyer ?? null,
+    supplier: supplier ? { id: supplier.id, companyName: supplier.companyName, userId: supplier.userId } : null,
+    createdAt: toIso(order.createdAt),
   };
 }
 
@@ -172,6 +253,90 @@ router.get("/admin/stats", requireAuth, requireRole("admin"), asyncHandler(async
     usersByMonth: [],
     revenueByMonth: [],
   });
+}));
+
+router.get("/admin/orders", requireAuth, requireRole("admin"), asyncHandler(async (req, res) => {
+  const { status, feeStatus, page = "1", limit = "50" } = req.query as any;
+  const pageNum = Math.max(1, parseInt(page));
+  const limitNum = Math.min(200, Math.max(1, parseInt(limit)));
+  const offset = (pageNum - 1) * limitNum;
+  const conditions: any[] = [];
+  if (status) conditions.push(eq(ordersTable.status, status));
+  if (feeStatus) conditions.push(eq(ordersTable.successFeeStatus, feeStatus));
+  const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+  const [rows, countResult] = await Promise.all([
+    db.select().from(ordersTable)
+      .leftJoin(suppliersTable, eq(suppliersTable.id, ordersTable.supplierId))
+      .where(whereClause)
+      .orderBy(desc(ordersTable.createdAt))
+      .limit(limitNum)
+      .offset(offset),
+    db.select({ count: sql<number>`cast(count(*) as int)` }).from(ordersTable).where(whereClause),
+  ]);
+
+  const orders = await Promise.all(rows.map((row: any) => buildOrderAdminRow(row.orders, row.suppliers)));
+  const total = countResult[0]?.count ?? 0;
+  res.json({
+    orders,
+    total,
+    page: pageNum,
+    limit: limitNum,
+    totalPages: Math.ceil(total / limitNum),
+  });
+}));
+
+router.patch("/admin/orders/:id/status", requireAuth, requireRole("admin"), asyncHandler(async (req, res) => {
+  const id = parseInt(String(req.params.id));
+  const parsed = orderStatusPatchSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ message: "Invalid order status payload", errors: parsed.error.issues });
+    return;
+  }
+
+  const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, id)).limit(1);
+  if (!order) {
+    res.status(404).json({ message: "Order not found" });
+    return;
+  }
+
+  const body = parsed.data;
+  const patch: Record<string, unknown> = { status: body.status, updatedAt: new Date() };
+  if (body.status === "completed") {
+    Object.assign(patch, buildSuccessFeePatch(order, {
+      dealValue: body.dealValue,
+      dealCurrency: body.dealCurrency,
+      markClosed: true,
+    }));
+  }
+
+  const [updated] = await db.update(ordersTable).set(patch).where(eq(ordersTable.id, id)).returning();
+  res.json(await buildOrderAdminRow(updated));
+}));
+
+router.patch("/admin/orders/:id/success-fee", requireAuth, requireRole("admin"), asyncHandler(async (req, res) => {
+  const id = parseInt(String(req.params.id));
+  const parsed = successFeePatchSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ message: "Invalid success fee payload", errors: parsed.error.issues });
+    return;
+  }
+
+  const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, id)).limit(1);
+  if (!order) {
+    res.status(404).json({ message: "Order not found" });
+    return;
+  }
+  if (order.status !== "completed") {
+    res.status(400).json({ message: "Success fee can only be managed after the deal is closed." });
+    return;
+  }
+
+  const [updated] = await db.update(ordersTable)
+    .set(buildSuccessFeePatch(order, parsed.data))
+    .where(eq(ordersTable.id, id))
+    .returning();
+  res.json(await buildOrderAdminRow(updated));
 }));
 
 router.get("/admin/suppliers", requireAuth, requireRole("admin"), asyncHandler(async (req, res) => {

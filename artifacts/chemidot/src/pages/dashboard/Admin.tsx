@@ -120,6 +120,29 @@ type CollectiveOrderRow = {
   createdAt?: string;
 };
 
+type OrderRow = {
+  id: number;
+  buyerId: number;
+  supplierId: number;
+  productName?: string | null;
+  quantity: string;
+  unit: string;
+  totalPrice: string;
+  currency: string;
+  status: string;
+  dealValue?: string | null;
+  dealCurrency?: string | null;
+  successFeeRate: string;
+  successFeeAmount?: string | null;
+  successFeePayer: "supplier";
+  successFeeStatus?: "pending" | "invoiced" | "paid" | "waived" | null;
+  successFeeNotes?: string | null;
+  successFeeMarkedAt?: string | null;
+  buyer?: { email?: string; companyName?: string | null } | null;
+  supplier?: { id: number; companyName: string } | null;
+  createdAt?: string | null;
+};
+
 type CategoryRow = {
   id: number;
   name: string;
@@ -134,6 +157,7 @@ type AdminData = {
   users: UserRow[];
   suppliers: SupplierRow[];
   products: ProductRow[];
+  orders: OrderRow[];
   rfqs: RfqRow[];
   collectiveOrders: CollectiveOrderRow[];
   categories: CategoryRow[];
@@ -144,6 +168,7 @@ const initialData: AdminData = {
   users: [],
   suppliers: [],
   products: [],
+  orders: [],
   rfqs: [],
   collectiveOrders: [],
   categories: [],
@@ -172,9 +197,9 @@ function StatusBadge({ value }: { value: string | boolean }) {
   const text = typeof value === "boolean" ? (value ? "Yes" : "No") : value;
   const normalized = String(text).toLowerCase();
   const className =
-    normalized === "active" || normalized === "open" || normalized === "in_stock" || normalized === "yes"
+    normalized === "active" || normalized === "open" || normalized === "in_stock" || normalized === "yes" || normalized === "paid" || normalized === "completed" || normalized === "delivered" || normalized === "confirmed"
       ? "bg-green-100 text-green-800 hover:bg-green-100 border-none"
-      : normalized === "suspended" || normalized === "closed" || normalized === "out_of_stock" || normalized === "no"
+      : normalized === "suspended" || normalized === "closed" || normalized === "out_of_stock" || normalized === "no" || normalized === "cancelled" || normalized === "waived"
         ? "bg-red-100 text-red-800 hover:bg-red-100 border-none"
         : "bg-amber-100 text-amber-800 hover:bg-amber-100 border-none";
 
@@ -232,11 +257,12 @@ export default function AdminDashboard() {
     if (!isAdmin) return;
     setLoading(true);
     try {
-      const [stats, users, suppliers, products, rfqs, collectiveOrders, categories] = await Promise.all([
+      const [stats, users, suppliers, products, orders, rfqs, collectiveOrders, categories] = await Promise.all([
         adminRequest<AdminStats>("/api/admin/stats"),
         adminRequest<{ users: UserRow[] }>("/api/admin/users?limit=200"),
         adminRequest<{ suppliers: SupplierRow[] }>("/api/admin/suppliers?limit=200"),
         adminRequest<{ products: ProductRow[] }>("/api/admin/products?limit=200"),
+        adminRequest<{ orders: OrderRow[] }>("/api/admin/orders?limit=200"),
         adminRequest<{ rfqs: RfqRow[] }>("/api/admin/rfqs?limit=200"),
         adminRequest<{ collectiveOrders: CollectiveOrderRow[] }>("/api/admin/collective-orders?limit=200"),
         adminRequest<CategoryRow[]>("/api/admin/categories"),
@@ -247,6 +273,7 @@ export default function AdminDashboard() {
         users: users.users ?? [],
         suppliers: suppliers.suppliers ?? [],
         products: products.products ?? [],
+        orders: orders.orders ?? [],
         rfqs: rfqs.rfqs ?? [],
         collectiveOrders: collectiveOrders.collectiveOrders ?? [],
         categories: categories ?? [],
@@ -291,6 +318,13 @@ export default function AdminDashboard() {
       ),
       products: data.products.filter((item) =>
         [item.name, item.availability, item.supplier?.companyName, item.category?.name].filter(Boolean).join(" ").toLowerCase().includes(q)
+      ),
+      orders: data.orders.filter((item) =>
+        [item.productName, item.status, item.currency, item.successFeeStatus, item.buyer?.email, item.buyer?.companyName, item.supplier?.companyName]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+          .includes(q)
       ),
       rfqs: data.rfqs.filter((item) =>
         [item.productName, item.status, item.buyer?.email, item.buyer?.companyName].filter(Boolean).join(" ").toLowerCase().includes(q)
@@ -358,6 +392,46 @@ export default function AdminDashboard() {
       body: JSON.stringify({ status }),
     });
     toast({ title: `${label} status updated` });
+    loadAdminData();
+  };
+
+  const closeOrderDeal = async (order: OrderRow) => {
+    const currentValue = order.dealValue ?? order.totalPrice;
+    const value = prompt("Deal value", String(currentValue ?? ""));
+    if (!value) return;
+    const parsedValue = Number(value);
+    if (!Number.isFinite(parsedValue) || parsedValue <= 0) {
+      toast({ title: "Invalid deal value", variant: "destructive" });
+      return;
+    }
+    if (!confirm("Mark this deal as completed and create a 2% success fee?")) return;
+    await adminRequest(`/api/admin/orders/${order.id}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ status: "completed", dealValue: parsedValue, dealCurrency: order.dealCurrency ?? order.currency }),
+    });
+    toast({ title: "Deal closed and success fee calculated" });
+    loadAdminData();
+  };
+
+  const updateSuccessFee = async (order: OrderRow, successFeeStatus?: "pending" | "invoiced" | "paid" | "waived") => {
+    const dealValueInput = prompt("Deal value", String(order.dealValue ?? order.totalPrice));
+    if (!dealValueInput) return;
+    const dealValue = Number(dealValueInput);
+    if (!Number.isFinite(dealValue) || dealValue <= 0) {
+      toast({ title: "Invalid deal value", variant: "destructive" });
+      return;
+    }
+    const notes = prompt("Admin notes", order.successFeeNotes ?? "") ?? order.successFeeNotes ?? "";
+    await adminRequest(`/api/admin/orders/${order.id}/success-fee`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        dealValue,
+        dealCurrency: order.dealCurrency ?? order.currency,
+        successFeeStatus,
+        successFeeNotes: notes,
+      }),
+    });
+    toast({ title: "Success fee updated" });
     loadAdminData();
   };
 
@@ -450,6 +524,7 @@ export default function AdminDashboard() {
             <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="suppliers">Suppliers</TabsTrigger>
             <TabsTrigger value="products">Products</TabsTrigger>
+            <TabsTrigger value="orders">Orders & Fees</TabsTrigger>
             <TabsTrigger value="rfqs">RFQs</TabsTrigger>
             <TabsTrigger value="collective">Collective Orders</TabsTrigger>
             <TabsTrigger value="categories">Categories</TabsTrigger>
@@ -694,6 +769,71 @@ export default function AdminDashboard() {
                         </TableCell>
                       </TableRow>
                     ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="orders">
+            <Card>
+              <CardHeader>
+                <CardTitle>Orders & Success Fees</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Deal</TableHead>
+                      <TableHead>Buyer</TableHead>
+                      <TableHead>Supplier</TableHead>
+                      <TableHead>Deal Value</TableHead>
+                      <TableHead>Success Fee</TableHead>
+                      <TableHead>Fee Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filtered.orders.length === 0 ? <EmptyRow colSpan={7} label="No orders found." /> : filtered.orders.map((row) => {
+                      const dealValue = row.dealValue ?? row.totalPrice;
+                      const feeAmount = row.successFeeAmount ?? (Number(dealValue) * 0.02).toFixed(2);
+                      return (
+                        <TableRow key={row.id}>
+                          <TableCell>
+                            <div className="font-medium">{row.productName || `Order #${row.id}`}</div>
+                            <div className="text-xs text-muted-foreground">#{row.id} - {row.quantity} {row.unit} - <StatusBadge value={row.status} /></div>
+                          </TableCell>
+                          <TableCell>{row.buyer?.companyName || row.buyer?.email || "-"}</TableCell>
+                          <TableCell>{row.supplier?.companyName ?? "-"}</TableCell>
+                          <TableCell>{row.dealCurrency ?? row.currency} {Number(dealValue).toLocaleString()}</TableCell>
+                          <TableCell>
+                            <div className="font-medium">{row.dealCurrency ?? row.currency} {Number(feeAmount).toLocaleString()}</div>
+                            <div className="text-xs text-muted-foreground">2% - payer: supplier</div>
+                          </TableCell>
+                          <TableCell><StatusBadge value={row.successFeeStatus ?? "not started"} /></TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex flex-wrap justify-end gap-2">
+                              {row.status !== "completed" ? (
+                                <Button variant="outline" size="sm" onClick={() => closeOrderDeal(row)}>
+                                  Close Deal
+                                </Button>
+                              ) : (
+                                <>
+                                  <SmallSelect
+                                    value={row.successFeeStatus ?? "pending"}
+                                    onChange={(status) => updateSuccessFee(row, status as "pending" | "invoiced" | "paid" | "waived")}
+                                    options={["pending", "invoiced", "paid", "waived"]}
+                                  />
+                                  <Button variant="outline" size="sm" onClick={() => updateSuccessFee(row)}>
+                                    Fee Details
+                                  </Button>
+                                </>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </CardContent>

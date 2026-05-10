@@ -387,6 +387,7 @@ export const UpdateOrderStatusBodyStatus = {
   processing: "processing",
   shipped: "shipped",
   delivered: "delivered",
+  completed: "completed",
   cancelled: "cancelled",
 } as const;
 
@@ -497,6 +498,14 @@ export interface Order {
   status: OrderStatus;
   trackingNumber?: string | null;
   estimatedDelivery?: string | null;
+  dealValue?: number | null;
+  dealCurrency?: string | null;
+  successFeeRate?: number | null;
+  successFeeAmount?: number | null;
+  successFeePayer?: "supplier" | null;
+  successFeeStatus?: "pending" | "invoiced" | "paid" | "waived" | null;
+  successFeeNotes?: string | null;
+  successFeeMarkedAt?: string | null;
   createdAt: string;
 }
 

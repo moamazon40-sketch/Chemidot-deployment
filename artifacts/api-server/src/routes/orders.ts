@@ -46,6 +46,7 @@ const STATUS_WORKFLOW = {
   processing: "Order is being processed and prepared for shipping",
   shipped: "Order has been shipped, tracking available",
   delivered: "Order has been delivered successfully",
+  completed: "Deal closed by Chemidot admin",
   cancelled: "Order has been cancelled"
 } as const;
 
