@@ -156,7 +156,6 @@ router.get("/rfqs", requireAuth, asyncHandler(async (req, res) => {
       conditions.push(sql`false`);
     }
 
-    conditions.push(eq(rfqsTable.status, "active"));
   }
 
   if (status) conditions.push(eq(rfqsTable.status, status));
@@ -778,12 +777,9 @@ router.post("/rfqs/:id/quotations/:qid/negotiations", requireAuth, asyncHandler(
       }
     }
     
-    if (body.proposedDeliveryTime) {
-      const proposedDate = new Date(body.proposedDeliveryTime);
-      if (isNaN(proposedDate.getTime()) || proposedDate <= new Date()) {
-        res.status(400).json({ message: "Proposed delivery time must be in the future" });
-        return;
-      }
+    if (body.proposedDeliveryTime && body.proposedDeliveryTime.trim().length > 100) {
+      res.status(400).json({ message: "Proposed lead time is too long" });
+      return;
     }
   }
 
