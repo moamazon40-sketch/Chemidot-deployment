@@ -1416,6 +1416,23 @@ export const MarkAllNotificationsReadResponse = zod.object({
 });
 
 /**
+ * @summary Mark notifications for one related type as read
+ */
+export const MarkRelatedNotificationsReadBody = zod.object({
+  relatedType: zod.enum(["rfq", "order", "message", "collective_order"]),
+});
+
+export const MarkRelatedNotificationsReadResponse = zod.object({
+  message: zod.string(),
+  count: zod.number().optional(),
+});
+
+/**
+ * @summary Mark one notification as read
+ */
+export const MarkNotificationReadResponse = ListNotificationsResponseItem;
+
+/**
  * @summary Get buyer dashboard statistics
  */
 export const GetBuyerStatsResponse = zod.object({

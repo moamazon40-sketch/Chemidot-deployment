@@ -27,8 +27,8 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/lib/auth";
-import { useState } from "react";
+import { getStoredToken, useAuth } from "@/lib/auth";
+import { useEffect, useState } from "react";
 
 const STATUS_COLORS: Record<string, string> = {
   active:  "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
@@ -318,6 +318,20 @@ export default function RfqDetail() {
 
   const { data: rfq, isLoading, refetch } = useGetRfq(id, { query: { enabled: !!id } as any });
   const { data: quotations, isLoading: quotLoading, refetch: refetchQuotations } = useListRfqQuotations(id, { query: { enabled: !!id } as any });
+
+  useEffect(() => {
+    if (!user || !id) return;
+    fetch("/api/notifications/read-related", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${getStoredToken() ?? ""}`,
+      },
+      body: JSON.stringify({ relatedType: "rfq" }),
+    }).finally(() => {
+      qc.invalidateQueries({ queryKey: ["/api/notifications"] });
+    });
+  }, [id, qc, user]);
 
   const handleAccept = async (quotationId: number, supplierName: string) => {
     try {

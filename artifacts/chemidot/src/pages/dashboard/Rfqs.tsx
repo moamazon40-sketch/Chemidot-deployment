@@ -1,5 +1,5 @@
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { useAuth } from "@/lib/auth";
+import { getStoredToken, useAuth } from "@/lib/auth";
 import { useListRfqs, useCreateRfq, useUpdateRfq, useDeleteRfq, useListCategories, getListRfqsQueryKey } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -334,6 +334,20 @@ export default function Rfqs() {
   const params = new URLSearchParams(search);
   const prefillProduct = params.get("product") || "";
   const prefillQty = params.get("qty") || "";
+
+  useEffect(() => {
+    if (!user) return;
+    fetch("/api/notifications/read-related", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${getStoredToken() ?? ""}`,
+      },
+      body: JSON.stringify({ relatedType: "rfq" }),
+    }).finally(() => {
+      qc.invalidateQueries({ queryKey: ["/api/notifications"] });
+    });
+  }, [qc, user]);
 
   const { data, isLoading, refetch } = useListRfqs({
     status: statusFilter === "all" ? undefined : (statusFilter as any),

@@ -7,9 +7,12 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/lib/auth";
+import { getStoredToken } from "@/lib/storage";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function Messages() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [activeId, setActiveId] = useState<number | null>(null);
   const [newMessage, setNewMessage] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -24,6 +27,19 @@ export default function Messages() {
   const { data: messagesData, isLoading: isLoadingMessages, refetch: refetchMessages } = useGetMessages(
     activeId || 0, { query: { enabled: !!activeId, refetchInterval: 4000 } as any }
   );
+
+  useEffect(() => {
+    fetch("/api/notifications/read-related", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${getStoredToken() ?? ""}`,
+      },
+      body: JSON.stringify({ relatedType: "message" }),
+    }).finally(() => {
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+    });
+  }, [queryClient]);
 
   useEffect(() => {
     const interval = setInterval(() => refetchConvos(), 8000);
@@ -42,6 +58,7 @@ export default function Messages() {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (activeId) queryClient.invalidateQueries({ queryKey: ["/api/messages"] });
   }, [messagesData]);
 
   const activeConvo = conversations.find((c: any) => c.id === activeId);

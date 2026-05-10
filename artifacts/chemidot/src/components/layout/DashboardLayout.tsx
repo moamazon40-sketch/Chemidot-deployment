@@ -32,6 +32,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { useListNotifications } from "@workspace/api-client-react";
+import { useListConversations } from "@workspace/api-client-react";
 import { useLanguage } from "@/lib/i18n";
 import { Badge } from "@/components/ui/badge";
 import logoImage from "@assets/Copy_of_Untitled_Design_(1)_1777886080670.png";
@@ -266,7 +267,11 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     { unreadOnly: true },
     { query: { enabled: !!user } as any }
   );
-  const unreadCount = notifs?.length ?? 0;
+  const { data: conversations } = useListConversations({
+    query: { enabled: !!user && user.role !== "admin" } as any,
+  });
+  const messageUnreadCount = conversations?.reduce((total: number, convo: any) => total + (Number(convo.unreadCount) || 0), 0) ?? 0;
+  const unreadCount = messageUnreadCount;
   const rfqUnreadCount = notifs?.filter((n: any) => n.relatedType === "rfq").length ?? 0;
   const orderUnreadCount = notifs?.filter((n: any) => n.relatedType === "order").length ?? 0;
 

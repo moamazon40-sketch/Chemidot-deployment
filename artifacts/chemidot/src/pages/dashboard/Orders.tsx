@@ -18,6 +18,7 @@ import {
 import { statusColor, formatDate, formatCurrency } from "@/lib/formatters";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 const STATUS_STEPS = ["confirmed", "processing", "shipped", "delivered"];
 
@@ -407,6 +408,7 @@ function SupplierInvoiceButton({ order, onUpdated }: { order: any; onUpdated: ()
 
 export default function Orders() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const { data, isLoading, refetch } = useListOrders();
   const [statusFilter, setStatusFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
@@ -415,6 +417,20 @@ export default function Orders() {
     const orderId = new URLSearchParams(window.location.search).get("orderId");
     if (orderId) setSearchTerm(orderId);
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    fetch("/api/notifications/read-related", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${getStoredToken() ?? ""}`,
+      },
+      body: JSON.stringify({ relatedType: "order" }),
+    }).finally(() => {
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+    });
+  }, [queryClient, user]);
 
   const allOrders = data?.orders ?? [];
   const filtered = allOrders.filter(o => {

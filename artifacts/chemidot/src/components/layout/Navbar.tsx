@@ -19,6 +19,7 @@ import { useLocation as useWouterLocation } from "wouter";
 import { useLanguage } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { getStoredToken } from "@/lib/storage";
+import { useQueryClient } from "@tanstack/react-query";
 import logoImage from "@assets/Copy_of_Untitled_Design_(1)_1777886080670.png";
 
 function NotificationsBell() {
@@ -26,12 +27,18 @@ function NotificationsBell() {
   const { user } = useAuth();
   const [, navigate] = useWouterLocation();
   const [open, setOpen] = useState(false);
+  const queryClient = useQueryClient();
   const { data: notifications, refetch } = useListNotifications({ unreadOnly: true });
   const markAllRead = useMarkAllNotificationsRead();
   const unreadCount = notifications?.length ?? 0;
 
   const handleMarkAll = () => {
-    markAllRead.mutate(undefined, { onSuccess: () => refetch() });
+    markAllRead.mutate(undefined, {
+      onSuccess: () => {
+        refetch();
+        queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+      },
+    });
   };
 
   const fallbackHref = () => (user?.role === "admin" ? "/admin" : "/dashboard");
@@ -44,6 +51,7 @@ function NotificationsBell() {
     if (n.relatedType === "order" && n.relatedId) {
       return user?.role === "admin" ? "/admin?tab=orders" : `/dashboard/orders?orderId=${n.relatedId}`;
     }
+    if (n.relatedType === "message") return "/dashboard/messages";
     return fallbackHref();
   };
 
@@ -57,6 +65,7 @@ function NotificationsBell() {
           headers: { Authorization: `Bearer ${getStoredToken() ?? ""}` },
         });
         await refetch();
+        await queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
       } catch {
         // Navigation should still happen even if the read marker fails.
       }

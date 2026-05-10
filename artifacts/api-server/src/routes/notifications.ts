@@ -17,6 +17,9 @@ function notificationTargetUrl(n: typeof notificationsTable.$inferSelect, role: 
   if (n.relatedType === "collective_order" && n.relatedId) {
     return role === "admin" ? "/admin?tab=collective" : "/dashboard/collective";
   }
+  if (n.relatedType === "message") {
+    return "/dashboard/messages";
+  }
   return role === "admin" ? "/admin" : "/dashboard";
 }
 
@@ -55,6 +58,26 @@ router.post("/notifications/read-all", requireAuth, asyncHandler(async (req, res
   await db.update(notificationsTable).set({ isRead: true })
     .where(eq(notificationsTable.userId, user.id));
   res.json({ message: "All notifications marked as read" });
+}));
+
+router.post("/notifications/read-related", requireAuth, asyncHandler(async (req, res) => {
+  const user = (req as any).user;
+  const relatedType = typeof req.body?.relatedType === "string" ? req.body.relatedType : "";
+  if (!["rfq", "order", "message", "collective_order"].includes(relatedType)) {
+    res.status(400).json({ message: "Invalid relatedType" });
+    return;
+  }
+
+  const updated = await db.update(notificationsTable)
+    .set({ isRead: true })
+    .where(and(
+      eq(notificationsTable.userId, user.id),
+      eq(notificationsTable.relatedType, relatedType),
+      eq(notificationsTable.isRead, false),
+    ))
+    .returning({ id: notificationsTable.id });
+
+  res.json({ message: "Related notifications marked as read", count: updated.length });
 }));
 
 router.post("/notifications/:id/read", requireAuth, asyncHandler(async (req, res) => {

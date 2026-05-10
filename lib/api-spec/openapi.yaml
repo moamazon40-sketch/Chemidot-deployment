@@ -1043,6 +1043,35 @@ paths:
               schema:
                 $ref: "#/components/schemas/MessageResponse"
 
+  /notifications/read-related:
+    post:
+      operationId: markRelatedNotificationsRead
+      tags: [notifications]
+      summary: Mark notifications for one related type as read
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                relatedType:
+                  type: string
+                  enum: [rfq, order, message, collective_order]
+              required: [relatedType]
+      responses:
+        "200":
+          description: Related notifications marked read
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  count:
+                    type: integer
+
   /notifications/{id}/read:
     post:
       operationId: markNotificationRead
