@@ -2027,6 +2027,45 @@ components:
         status:
           type: string
           enum: [pending, confirmed, processing, shipped, delivered, completed, cancelled]
+        dealStage:
+          type: string
+          enum: [buyer_accepted, supplier_confirmed, admin_needs_review, admin_approved, buyer_confirmed, invoice_issued, closed, cancelled]
+          nullable: true
+        paymentStatus:
+          type: string
+          enum: [not_started, pending, confirmed]
+          nullable: true
+        fulfillmentStatus:
+          type: string
+          enum: [not_started, preparing, ready_for_pickup, shipped, delivered, completed, cancelled]
+          nullable: true
+        confirmedUnitPrice:
+          type: number
+          nullable: true
+        confirmedQuantity:
+          type: number
+          nullable: true
+        confirmedLeadTime:
+          type: string
+          nullable: true
+        confirmedIncoterm:
+          type: string
+          nullable: true
+        paymentTerms:
+          type: string
+          nullable: true
+        offerValidityDate:
+          type: string
+          nullable: true
+        proformaInvoiceUrl:
+          type: string
+          nullable: true
+        commercialInvoiceUrl:
+          type: string
+          nullable: true
+        orderDocumentNotes:
+          type: string
+          nullable: true
         trackingNumber:
           type: string
           nullable: true

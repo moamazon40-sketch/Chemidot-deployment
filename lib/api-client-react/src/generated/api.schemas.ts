@@ -482,6 +482,40 @@ export const OrderStatus = {
   processing: "processing",
   shipped: "shipped",
   delivered: "delivered",
+  completed: "completed",
+  cancelled: "cancelled",
+} as const;
+
+export type OrderDealStage = (typeof OrderDealStage)[keyof typeof OrderDealStage];
+
+export const OrderDealStage = {
+  buyer_accepted: "buyer_accepted",
+  supplier_confirmed: "supplier_confirmed",
+  admin_needs_review: "admin_needs_review",
+  admin_approved: "admin_approved",
+  buyer_confirmed: "buyer_confirmed",
+  invoice_issued: "invoice_issued",
+  closed: "closed",
+  cancelled: "cancelled",
+} as const;
+
+export type OrderPaymentStatus = (typeof OrderPaymentStatus)[keyof typeof OrderPaymentStatus];
+
+export const OrderPaymentStatus = {
+  not_started: "not_started",
+  pending: "pending",
+  confirmed: "confirmed",
+} as const;
+
+export type OrderFulfillmentStatus = (typeof OrderFulfillmentStatus)[keyof typeof OrderFulfillmentStatus];
+
+export const OrderFulfillmentStatus = {
+  not_started: "not_started",
+  preparing: "preparing",
+  ready_for_pickup: "ready_for_pickup",
+  shipped: "shipped",
+  delivered: "delivered",
+  completed: "completed",
   cancelled: "cancelled",
 } as const;
 
@@ -496,6 +530,18 @@ export interface Order {
   totalPrice: number;
   currency: string;
   status: OrderStatus;
+  dealStage?: OrderDealStage | null;
+  paymentStatus?: OrderPaymentStatus | null;
+  fulfillmentStatus?: OrderFulfillmentStatus | null;
+  confirmedUnitPrice?: number | null;
+  confirmedQuantity?: number | null;
+  confirmedLeadTime?: string | null;
+  confirmedIncoterm?: string | null;
+  paymentTerms?: string | null;
+  offerValidityDate?: string | null;
+  proformaInvoiceUrl?: string | null;
+  commercialInvoiceUrl?: string | null;
+  orderDocumentNotes?: string | null;
   trackingNumber?: string | null;
   estimatedDelivery?: string | null;
   dealValue?: number | null;

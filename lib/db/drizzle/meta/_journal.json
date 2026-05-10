@@ -36,6 +36,27 @@
       "when": 1778448000000,
       "tag": "0004_order_success_fees",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1778451600000,
+      "tag": "0005_order_workflow_tracks",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1778455200000,
+      "tag": "0006_order_final_terms",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1778458800000,
+      "tag": "0007_order_invoice_documents",
+      "breakpoints": true
     }
   ]
 }

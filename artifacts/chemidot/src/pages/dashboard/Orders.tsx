@@ -1,5 +1,5 @@
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { useAuth } from "@/lib/auth";
+import { getStoredToken, useAuth } from "@/lib/auth";
 import { useListOrders, useUpdateOrderStatus } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -72,12 +72,21 @@ function UpdateStatusDialog({ order, onUpdated }: {
   const [open, setOpen] = useState(false);
   const [trackingNumber, setTrackingNumber] = useState(order.trackingNumber || "");
   const [estimatedDelivery, setEstimatedDelivery] = useState("");
+  const [confirmingAvailability, setConfirmingAvailability] = useState(false);
+  const [finalTerms, setFinalTerms] = useState({
+    confirmedUnitPrice: order.confirmedUnitPrice ? String(order.confirmedUnitPrice) : String(order.totalPrice && order.quantity ? order.totalPrice / order.quantity : ""),
+    confirmedQuantity: order.confirmedQuantity ? String(order.confirmedQuantity) : String(order.quantity ?? ""),
+    confirmedLeadTime: order.confirmedLeadTime ?? "",
+    confirmedIncoterm: order.confirmedIncoterm ?? "",
+    paymentTerms: order.paymentTerms ?? "",
+    offerValidityDate: order.offerValidityDate ? String(order.offerValidityDate).slice(0, 10) : "",
+  });
 
   const isSupplier = user?.role === "supplier";
   const isBuyer = user?.role === "buyer";
 
   const NEXT_STATUS: Record<string, { label: string; role: string }> = {
-    pending:    { label: "Confirm Order", role: "supplier" },
+    pending:    { label: order.dealStage === "buyer_accepted" ? "Confirm Availability" : "Confirm Order", role: "supplier" },
     confirmed:  { label: "Start Processing", role: "supplier" },
     processing: { label: "Mark as Shipped", role: "supplier" },
     shipped:    { label: "Confirm Delivery", role: "buyer" },
@@ -92,6 +101,43 @@ function UpdateStatusDialog({ order, onUpdated }: {
   if (!nextStatus) return null;
 
   const needsTracking = order.status === "processing";
+  const isAvailabilityConfirmation = isSupplier && order.status === "pending" && order.dealStage === "buyer_accepted";
+
+  const handleConfirmAvailability = async () => {
+    const unitPrice = Number(finalTerms.confirmedUnitPrice);
+    const quantity = Number(finalTerms.confirmedQuantity);
+    if (!Number.isFinite(unitPrice) || unitPrice <= 0 || !Number.isFinite(quantity) || quantity <= 0) {
+      toast({ title: "Please enter a valid price and quantity", variant: "destructive" });
+      return;
+    }
+    setConfirmingAvailability(true);
+    try {
+      const res = await fetch(`/api/orders/${order.id}/confirm-availability`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${getStoredToken() ?? ""}`,
+        },
+        body: JSON.stringify({
+          confirmedUnitPrice: unitPrice,
+          confirmedQuantity: quantity,
+          confirmedLeadTime: finalTerms.confirmedLeadTime,
+          confirmedIncoterm: finalTerms.confirmedIncoterm,
+          paymentTerms: finalTerms.paymentTerms,
+          offerValidityDate: finalTerms.offerValidityDate ? new Date(finalTerms.offerValidityDate).toISOString() : "",
+        }),
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload.message || "Failed to confirm availability");
+      toast({ title: "Availability confirmed", description: "Chemidot admin and buyer were notified." });
+      setOpen(false);
+      onUpdated();
+    } catch (err: any) {
+      toast({ title: err.message || "Failed to confirm availability", variant: "destructive" });
+    } finally {
+      setConfirmingAvailability(false);
+    }
+  };
 
   const handleUpdate = () => {
     updateStatus.mutate({
@@ -127,9 +173,43 @@ function UpdateStatusDialog({ order, onUpdated }: {
           </DialogHeader>
           <div className="space-y-4 pt-2">
             <p className="text-sm text-muted-foreground">
-              Update order #{order.id.toString().padStart(6, "0")} status to <strong>{nextStatus}</strong>.
+              {isAvailabilityConfirmation
+                ? "Confirm the final commercial terms before Chemidot reviews the deal."
+                : <>Update order #{order.id.toString().padStart(6, "0")} status to <strong>{nextStatus}</strong>.</>}
             </p>
-            {needsTracking && (
+            {isAvailabilityConfirmation && (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label>Final Unit Price</Label>
+                    <Input type="number" min="0" step="0.01" value={finalTerms.confirmedUnitPrice} onChange={e => setFinalTerms((prev) => ({ ...prev, confirmedUnitPrice: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Available Quantity</Label>
+                    <Input type="number" min="0" step="0.01" value={finalTerms.confirmedQuantity} onChange={e => setFinalTerms((prev) => ({ ...prev, confirmedQuantity: e.target.value }))} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label>Lead Time</Label>
+                    <Input placeholder="Example: 14 days" value={finalTerms.confirmedLeadTime} onChange={e => setFinalTerms((prev) => ({ ...prev, confirmedLeadTime: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Incoterm</Label>
+                    <Input placeholder="Example: CIF" value={finalTerms.confirmedIncoterm} onChange={e => setFinalTerms((prev) => ({ ...prev, confirmedIncoterm: e.target.value }))} />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Payment Terms</Label>
+                  <Input placeholder="Example: 30% advance, 70% before shipment" value={finalTerms.paymentTerms} onChange={e => setFinalTerms((prev) => ({ ...prev, paymentTerms: e.target.value }))} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Offer Valid Until</Label>
+                  <Input type="date" value={finalTerms.offerValidityDate} onChange={e => setFinalTerms((prev) => ({ ...prev, offerValidityDate: e.target.value }))} />
+                </div>
+              </>
+            )}
+            {!isAvailabilityConfirmation && needsTracking && (
               <div className="space-y-1.5">
                 <Label>Tracking Number</Label>
                 <Input
@@ -139,7 +219,7 @@ function UpdateStatusDialog({ order, onUpdated }: {
                 />
               </div>
             )}
-            {(needsTracking || order.status === "confirmed") && (
+            {!isAvailabilityConfirmation && (needsTracking || order.status === "confirmed") && (
               <div className="space-y-1.5">
                 <Label>Estimated Delivery</Label>
                 <Input
@@ -151,9 +231,111 @@ function UpdateStatusDialog({ order, onUpdated }: {
             )}
             <div className="flex justify-end gap-2 pt-2 border-t">
               <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-              <Button onClick={handleUpdate} disabled={updateStatus.isPending}>
+              <Button onClick={isAvailabilityConfirmation ? handleConfirmAvailability : handleUpdate} disabled={updateStatus.isPending || confirmingAvailability}>
                 {updateStatus.isPending ? "Updating…" : next.label}
               </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+function BuyerFinalConfirmButton({ order, onUpdated }: { order: any; onUpdated: () => void }) {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  if (user?.role !== "buyer" || order.dealStage !== "admin_approved") return null;
+
+  const handleConfirm = async () => {
+    if (!confirm("Confirm this final order? Supplier and Chemidot admin will be notified.")) return;
+    setIsSubmitting(true);
+    try {
+      const res = await fetch(`/api/orders/${order.id}/final-confirmation`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${getStoredToken() ?? ""}`,
+        },
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload.message || "Failed to confirm final order");
+      toast({ title: "Final order confirmed" });
+      onUpdated();
+    } catch (err: any) {
+      toast({ title: err.message || "Failed to confirm final order", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <Button size="sm" className="gap-1.5" onClick={handleConfirm} disabled={isSubmitting}>
+      <CheckCircle2 className="w-3.5 h-3.5" /> {isSubmitting ? "Confirming..." : "Confirm Final Order"}
+    </Button>
+  );
+}
+
+function SupplierInvoiceButton({ order, onUpdated }: { order: any; onUpdated: () => void }) {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [open, setOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [form, setForm] = useState({
+    proformaInvoiceUrl: order.proformaInvoiceUrl ?? "",
+    commercialInvoiceUrl: order.commercialInvoiceUrl ?? "",
+    orderDocumentNotes: order.orderDocumentNotes ?? "",
+  });
+  if (user?.role !== "supplier" || order.dealStage !== "buyer_confirmed") return null;
+
+  const handleSubmit = async () => {
+    if (!form.proformaInvoiceUrl.trim()) {
+      toast({ title: "Proforma invoice URL is required", variant: "destructive" });
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const res = await fetch(`/api/orders/${order.id}/issue-invoice`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${getStoredToken() ?? ""}` },
+        body: JSON.stringify(form),
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload.message || "Failed to issue invoice");
+      toast({ title: "Invoice issued", description: "Buyer and Chemidot admin were notified." });
+      setOpen(false);
+      onUpdated();
+    } catch (err: any) {
+      toast({ title: err.message || "Failed to issue invoice", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <>
+      <Button size="sm" className="gap-1.5" onClick={() => setOpen(true)}>
+        <Package className="w-3.5 h-3.5" /> Issue Invoice
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Issue Invoice</DialogTitle></DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-1.5">
+              <Label>Proforma Invoice URL</Label>
+              <Input value={form.proformaInvoiceUrl} onChange={e => setForm(prev => ({ ...prev, proformaInvoiceUrl: e.target.value }))} placeholder="/api/uploads/invoice.pdf or document URL" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Commercial Invoice URL</Label>
+              <Input value={form.commercialInvoiceUrl} onChange={e => setForm(prev => ({ ...prev, commercialInvoiceUrl: e.target.value }))} placeholder="Optional" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Notes</Label>
+              <Input value={form.orderDocumentNotes} onChange={e => setForm(prev => ({ ...prev, orderDocumentNotes: e.target.value }))} placeholder="Optional document notes" />
+            </div>
+            <div className="flex justify-end gap-2 pt-2 border-t">
+              <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+              <Button onClick={handleSubmit} disabled={isSubmitting}>{isSubmitting ? "Issuing..." : "Issue Invoice"}</Button>
             </div>
           </div>
         </DialogContent>
@@ -280,6 +462,8 @@ export default function Orders() {
                             </div>
                           )}
                           <div className="flex gap-2">
+                            <BuyerFinalConfirmButton order={order} onUpdated={refetch} />
+                            <SupplierInvoiceButton order={order} onUpdated={refetch} />
                             <UpdateStatusDialog order={order} onUpdated={refetch} />
                           </div>
                         </div>

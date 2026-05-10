@@ -60,6 +60,17 @@ const orderStatusPatchSchema = z.object({
   dealValue: z.number().positive().optional(),
   dealCurrency: z.string().min(1).optional(),
 });
+const adminDealStageSchema = z.enum(["admin_approved", "admin_needs_review", "cancelled"]);
+const adminDealStagePatchSchema = z.object({
+  dealStage: adminDealStageSchema,
+  adminNotes: z.string().max(1000).optional(),
+});
+const paymentStatusPatchSchema = z.object({
+  paymentStatus: z.enum(["pending", "confirmed"]),
+});
+const fulfillmentStatusPatchSchema = z.object({
+  fulfillmentStatus: z.enum(["preparing", "ready_for_pickup", "shipped", "delivered", "completed", "cancelled"]),
+});
 const successFeePatchSchema = z.object({
   dealValue: z.number().positive().optional(),
   dealCurrency: z.string().min(1).optional(),
@@ -110,6 +121,26 @@ function toIso(value: Date | string | null | undefined) {
   if (!value) return null;
   const date = value instanceof Date ? value : new Date(value);
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+async function notifyUser(input: {
+  userId?: number | null;
+  type: "rfq_update" | "new_quotation" | "order_update" | "collective_milestone" | "payment_reminder" | "system";
+  title: string;
+  message: string;
+  relatedId?: number | null;
+  relatedType?: string;
+}) {
+  if (!input.userId) return;
+  await db.insert(notificationsTable).values({
+    userId: input.userId,
+    type: input.type,
+    title: input.title,
+    message: input.message,
+    relatedId: input.relatedId ?? null,
+    relatedType: input.relatedType ?? null,
+    isRead: false,
+  });
 }
 
 async function buildSupplierAdminRow(supplier: typeof suppliersTable.$inferSelect) {
@@ -164,6 +195,18 @@ async function buildOrderAdminRow(order: typeof ordersTable.$inferSelect, suppli
     totalPrice: order.totalPrice,
     currency: order.currency,
     status: order.status,
+    dealStage: order.dealStage,
+    paymentStatus: order.paymentStatus,
+    fulfillmentStatus: order.fulfillmentStatus,
+    confirmedUnitPrice: order.confirmedUnitPrice,
+    confirmedQuantity: order.confirmedQuantity,
+    confirmedLeadTime: order.confirmedLeadTime,
+    confirmedIncoterm: order.confirmedIncoterm,
+    paymentTerms: order.paymentTerms,
+    offerValidityDate: toIso(order.offerValidityDate),
+    proformaInvoiceUrl: order.proformaInvoiceUrl,
+    commercialInvoiceUrl: order.commercialInvoiceUrl,
+    orderDocumentNotes: order.orderDocumentNotes,
     deliveryAddress: order.deliveryAddress,
     dealValue: order.dealValue,
     dealCurrency: order.dealCurrency ?? order.currency,
@@ -303,6 +346,8 @@ router.patch("/admin/orders/:id/status", requireAuth, requireRole("admin"), asyn
   const body = parsed.data;
   const patch: Record<string, unknown> = { status: body.status, updatedAt: new Date() };
   if (body.status === "completed") {
+    patch.dealStage = "closed";
+    patch.fulfillmentStatus = order.fulfillmentStatus === "not_started" ? "completed" : order.fulfillmentStatus;
     Object.assign(patch, buildSuccessFeePatch(order, {
       dealValue: body.dealValue,
       dealCurrency: body.dealCurrency,
@@ -312,6 +357,150 @@ router.patch("/admin/orders/:id/status", requireAuth, requireRole("admin"), asyn
 
   const [updated] = await db.update(ordersTable).set(patch).where(eq(ordersTable.id, id)).returning();
   res.json(await buildOrderAdminRow(updated));
+}));
+
+router.patch("/admin/orders/:id/deal-stage", requireAuth, requireRole("admin"), asyncHandler(async (req, res) => {
+  const id = parseInt(String(req.params.id));
+  const parsed = adminDealStagePatchSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ message: "Invalid deal review payload", errors: parsed.error.issues });
+    return;
+  }
+
+  const [row] = await db.select().from(ordersTable)
+    .leftJoin(suppliersTable, eq(suppliersTable.id, ordersTable.supplierId))
+    .where(eq(ordersTable.id, id))
+    .limit(1);
+
+  if (!row) {
+    res.status(404).json({ message: "Order not found" });
+    return;
+  }
+  if (row.orders.dealStage !== "supplier_confirmed" && row.orders.dealStage !== "admin_needs_review") {
+    res.status(400).json({ message: "Only supplier-confirmed deals can be reviewed by admin" });
+    return;
+  }
+
+  const body = parsed.data;
+  const update: Record<string, unknown> = {
+    dealStage: body.dealStage,
+    updatedAt: new Date(),
+  };
+  if (body.dealStage === "cancelled") {
+    update.status = "cancelled";
+  }
+  if (body.adminNotes !== undefined) {
+    update.successFeeNotes = body.adminNotes;
+  }
+
+  const [updated] = await db.update(ordersTable).set(update).where(eq(ordersTable.id, id)).returning();
+
+  const titleByStage: Record<string, string> = {
+    admin_approved: "Deal approved by Chemidot",
+    admin_needs_review: "Deal needs review",
+    cancelled: "Deal cancelled by Chemidot",
+  };
+  const message = `${titleByStage[body.dealStage]} for ${row.orders.productName ?? "your order"}.`;
+  await Promise.all([
+    notifyUser({
+      userId: row.orders.buyerId,
+      type: "order_update",
+      title: titleByStage[body.dealStage],
+      message,
+      relatedId: row.orders.id,
+      relatedType: "order",
+    }),
+    notifyUser({
+      userId: row.suppliers?.userId,
+      type: "order_update",
+      title: titleByStage[body.dealStage],
+      message,
+      relatedId: row.orders.id,
+      relatedType: "order",
+    }),
+  ]);
+
+  res.json(await buildOrderAdminRow(updated, row.suppliers));
+}));
+
+router.patch("/admin/orders/:id/payment-status", requireAuth, requireRole("admin"), asyncHandler(async (req, res) => {
+  const id = parseInt(String(req.params.id));
+  const parsed = paymentStatusPatchSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ message: "Invalid payment status payload", errors: parsed.error.issues });
+    return;
+  }
+
+  const [row] = await db.select().from(ordersTable)
+    .leftJoin(suppliersTable, eq(suppliersTable.id, ordersTable.supplierId))
+    .where(eq(ordersTable.id, id))
+    .limit(1);
+  if (!row) {
+    res.status(404).json({ message: "Order not found" });
+    return;
+  }
+  if (row.orders.dealStage !== "invoice_issued" && row.orders.dealStage !== "closed") {
+    res.status(400).json({ message: "Payment can only be updated after invoice is issued" });
+    return;
+  }
+
+  const [updated] = await db.update(ordersTable).set({
+    paymentStatus: parsed.data.paymentStatus,
+    updatedAt: new Date(),
+  }).where(eq(ordersTable.id, id)).returning();
+
+  const title = parsed.data.paymentStatus === "confirmed" ? "Payment confirmed" : "Payment pending";
+  await Promise.all([
+    notifyUser({ userId: row.orders.buyerId, type: "order_update", title, message: `Payment status changed for ${row.orders.productName ?? "your order"}.`, relatedId: row.orders.id, relatedType: "order" }),
+    notifyUser({ userId: row.suppliers?.userId, type: "order_update", title, message: `Payment status changed for ${row.orders.productName ?? "your order"}.`, relatedId: row.orders.id, relatedType: "order" }),
+  ]);
+
+  res.json(await buildOrderAdminRow(updated, row.suppliers));
+}));
+
+router.patch("/admin/orders/:id/fulfillment-status", requireAuth, requireRole("admin"), asyncHandler(async (req, res) => {
+  const id = parseInt(String(req.params.id));
+  const parsed = fulfillmentStatusPatchSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ message: "Invalid fulfillment status payload", errors: parsed.error.issues });
+    return;
+  }
+
+  const [row] = await db.select().from(ordersTable)
+    .leftJoin(suppliersTable, eq(suppliersTable.id, ordersTable.supplierId))
+    .where(eq(ordersTable.id, id))
+    .limit(1);
+  if (!row) {
+    res.status(404).json({ message: "Order not found" });
+    return;
+  }
+  if (row.orders.paymentStatus !== "confirmed" && parsed.data.fulfillmentStatus !== "cancelled") {
+    res.status(400).json({ message: "Fulfillment should start after payment is confirmed" });
+    return;
+  }
+
+  const nextStatus = parsed.data.fulfillmentStatus === "shipped"
+    ? "shipped"
+    : parsed.data.fulfillmentStatus === "delivered" || parsed.data.fulfillmentStatus === "completed"
+      ? "delivered"
+      : parsed.data.fulfillmentStatus === "cancelled"
+        ? "cancelled"
+        : row.orders.status;
+
+  const [updated] = await db.update(ordersTable).set({
+    fulfillmentStatus: parsed.data.fulfillmentStatus,
+    status: nextStatus,
+    updatedAt: new Date(),
+  }).where(eq(ordersTable.id, id)).returning();
+
+  const title = "Fulfillment status updated";
+  const message = `Fulfillment is now ${parsed.data.fulfillmentStatus.replace(/_/g, " ")} for ${row.orders.productName ?? "your order"}.`;
+  await Promise.all([
+    notifyUser({ userId: row.orders.buyerId, type: "order_update", title, message, relatedId: row.orders.id, relatedType: "order" }),
+    notifyUser({ userId: row.suppliers?.userId, type: "order_update", title, message, relatedId: row.orders.id, relatedType: "order" }),
+  ]);
+
+  res.json(await buildOrderAdminRow(updated, row.suppliers));
 }));
 
 router.patch("/admin/orders/:id/success-fee", requireAuth, requireRole("admin"), asyncHandler(async (req, res) => {

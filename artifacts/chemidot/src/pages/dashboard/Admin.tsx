@@ -130,6 +130,18 @@ type OrderRow = {
   totalPrice: string;
   currency: string;
   status: string;
+  dealStage?: string | null;
+  paymentStatus?: string | null;
+  fulfillmentStatus?: string | null;
+  confirmedUnitPrice?: string | null;
+  confirmedQuantity?: string | null;
+  confirmedLeadTime?: string | null;
+  confirmedIncoterm?: string | null;
+  paymentTerms?: string | null;
+  offerValidityDate?: string | null;
+  proformaInvoiceUrl?: string | null;
+  commercialInvoiceUrl?: string | null;
+  orderDocumentNotes?: string | null;
   dealValue?: string | null;
   dealCurrency?: string | null;
   successFeeRate: string;
@@ -320,7 +332,7 @@ export default function AdminDashboard() {
         [item.name, item.availability, item.supplier?.companyName, item.category?.name].filter(Boolean).join(" ").toLowerCase().includes(q)
       ),
       orders: data.orders.filter((item) =>
-        [item.productName, item.status, item.currency, item.successFeeStatus, item.buyer?.email, item.buyer?.companyName, item.supplier?.companyName]
+        [item.productName, item.status, item.dealStage, item.paymentStatus, item.fulfillmentStatus, item.currency, item.successFeeStatus, item.buyer?.email, item.buyer?.companyName, item.supplier?.companyName]
           .filter(Boolean)
           .join(" ")
           .toLowerCase()
@@ -432,6 +444,35 @@ export default function AdminDashboard() {
       }),
     });
     toast({ title: "Success fee updated" });
+    loadAdminData();
+  };
+
+  const updateOrderDealStage = async (order: OrderRow, dealStage: "admin_approved" | "admin_needs_review" | "cancelled") => {
+    const notes = dealStage === "admin_needs_review" ? prompt("What needs review?", order.successFeeNotes ?? "") : "";
+    if (dealStage === "cancelled" && !confirm("Cancel this deal? Buyer and supplier will be notified.")) return;
+    await adminRequest(`/api/admin/orders/${order.id}/deal-stage`, {
+      method: "PATCH",
+      body: JSON.stringify({ dealStage, adminNotes: notes || undefined }),
+    });
+    toast({ title: "Deal review updated" });
+    loadAdminData();
+  };
+
+  const updateOrderPaymentStatus = async (order: OrderRow, paymentStatus: "pending" | "confirmed") => {
+    await adminRequest(`/api/admin/orders/${order.id}/payment-status`, {
+      method: "PATCH",
+      body: JSON.stringify({ paymentStatus }),
+    });
+    toast({ title: "Payment status updated" });
+    loadAdminData();
+  };
+
+  const updateOrderFulfillmentStatus = async (order: OrderRow, fulfillmentStatus: "preparing" | "ready_for_pickup" | "shipped" | "delivered" | "completed" | "cancelled") => {
+    await adminRequest(`/api/admin/orders/${order.id}/fulfillment-status`, {
+      method: "PATCH",
+      body: JSON.stringify({ fulfillmentStatus }),
+    });
+    toast({ title: "Fulfillment status updated" });
     loadAdminData();
   };
 
@@ -801,7 +842,7 @@ export default function AdminDashboard() {
                         <TableRow key={row.id}>
                           <TableCell>
                             <div className="font-medium">{row.productName || `Order #${row.id}`}</div>
-                            <div className="text-xs text-muted-foreground">#{row.id} - {row.quantity} {row.unit} - <StatusBadge value={row.status} /></div>
+                            <div className="text-xs text-muted-foreground">#{row.id} - {row.quantity} {row.unit} - <StatusBadge value={row.dealStage ?? row.status} /></div>
                           </TableCell>
                           <TableCell>{row.buyer?.companyName || row.buyer?.email || "-"}</TableCell>
                           <TableCell>{row.supplier?.companyName ?? "-"}</TableCell>
@@ -814,9 +855,38 @@ export default function AdminDashboard() {
                           <TableCell className="text-right">
                             <div className="flex flex-wrap justify-end gap-2">
                               {row.status !== "completed" ? (
-                                <Button variant="outline" size="sm" onClick={() => closeOrderDeal(row)}>
-                                  Close Deal
-                                </Button>
+                                <>
+                                  {(row.dealStage === "supplier_confirmed" || row.dealStage === "admin_needs_review") && (
+                                    <>
+                                      <Button variant="outline" size="sm" onClick={() => updateOrderDealStage(row, "admin_approved")}>
+                                        Approve Deal
+                                      </Button>
+                                      <Button variant="outline" size="sm" onClick={() => updateOrderDealStage(row, "admin_needs_review")}>
+                                        Needs Review
+                                      </Button>
+                                      <Button variant="outline" size="sm" onClick={() => updateOrderDealStage(row, "cancelled")}>
+                                        Cancel
+                                      </Button>
+                                    </>
+                                  )}
+                                  {row.dealStage === "invoice_issued" && (
+                                    <SmallSelect
+                                      value={row.paymentStatus ?? "pending"}
+                                      onChange={(status) => updateOrderPaymentStatus(row, status as "pending" | "confirmed")}
+                                      options={["pending", "confirmed"]}
+                                    />
+                                  )}
+                                  {row.paymentStatus === "confirmed" && (
+                                    <SmallSelect
+                                      value={row.fulfillmentStatus ?? "not_started"}
+                                      onChange={(status) => updateOrderFulfillmentStatus(row, status as "preparing" | "ready_for_pickup" | "shipped" | "delivered" | "completed" | "cancelled")}
+                                      options={["preparing", "ready_for_pickup", "shipped", "delivered", "completed", "cancelled"]}
+                                    />
+                                  )}
+                                  <Button variant="outline" size="sm" onClick={() => closeOrderDeal(row)}>
+                                    Close Deal
+                                  </Button>
+                                </>
                               ) : (
                                 <>
                                   <SmallSelect

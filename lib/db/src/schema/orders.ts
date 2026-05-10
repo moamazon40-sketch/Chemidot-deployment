@@ -8,6 +8,26 @@ import { productsTable } from "./products";
 export const orderStatusEnum = pgEnum("order_status", ["pending", "confirmed", "processing", "shipped", "delivered", "completed", "cancelled"]);
 export const successFeeStatusEnum = pgEnum("success_fee_status", ["pending", "invoiced", "paid", "waived"]);
 export const successFeePayerEnum = pgEnum("success_fee_payer", ["supplier"]);
+export const dealStageEnum = pgEnum("deal_stage", [
+  "buyer_accepted",
+  "supplier_confirmed",
+  "admin_needs_review",
+  "admin_approved",
+  "buyer_confirmed",
+  "invoice_issued",
+  "closed",
+  "cancelled",
+]);
+export const paymentStatusEnum = pgEnum("payment_status", ["not_started", "pending", "confirmed"]);
+export const fulfillmentStatusEnum = pgEnum("fulfillment_status", [
+  "not_started",
+  "preparing",
+  "ready_for_pickup",
+  "shipped",
+  "delivered",
+  "completed",
+  "cancelled",
+]);
 
 export const ordersTable = pgTable("orders", {
   id: serial("id").primaryKey(),
@@ -22,6 +42,18 @@ export const ordersTable = pgTable("orders", {
   totalPrice: numeric("total_price", { precision: 14, scale: 2 }).notNull(),
   currency: text("currency").notNull().default("USD"),
   status: orderStatusEnum("status").notNull().default("pending"),
+  dealStage: dealStageEnum("deal_stage"),
+  paymentStatus: paymentStatusEnum("payment_status").notNull().default("not_started"),
+  fulfillmentStatus: fulfillmentStatusEnum("fulfillment_status").notNull().default("not_started"),
+  confirmedUnitPrice: numeric("confirmed_unit_price", { precision: 14, scale: 2 }),
+  confirmedQuantity: numeric("confirmed_quantity", { precision: 12, scale: 2 }),
+  confirmedLeadTime: text("confirmed_lead_time"),
+  confirmedIncoterm: text("confirmed_incoterm"),
+  paymentTerms: text("payment_terms"),
+  offerValidityDate: timestamp("offer_validity_date"),
+  proformaInvoiceUrl: text("proforma_invoice_url"),
+  commercialInvoiceUrl: text("commercial_invoice_url"),
+  orderDocumentNotes: text("order_document_notes"),
   trackingNumber: text("tracking_number"),
   estimatedDelivery: timestamp("estimated_delivery"),
   deliveryAddress: text("delivery_address"),

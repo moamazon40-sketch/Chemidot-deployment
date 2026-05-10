@@ -577,7 +577,8 @@ router.post("/rfqs/:id/quotations/:qid/accept", requireAuth, asyncHandler(async 
       unit: rfq.unit,
       totalPrice: String(totalPrice),
       currency: quotation.quotations.currency,
-      status: "confirmed",
+      status: "pending",
+      dealStage: "buyer_accepted",
       deliveryAddress: rfq.deliveryDestination,
     }).returning();
 
@@ -613,6 +614,9 @@ router.post("/rfqs/:id/quotations/:qid/accept", requireAuth, asyncHandler(async 
     totalPrice: parseFloat(result.order.totalPrice),
     currency: result.order.currency,
     status: result.order.status,
+    dealStage: result.order.dealStage,
+    paymentStatus: result.order.paymentStatus,
+    fulfillmentStatus: result.order.fulfillmentStatus,
     trackingNumber: null,
     estimatedDelivery: null,
     createdAt: result.order.createdAt instanceof Date ? result.order.createdAt.toISOString() : result.order.createdAt,
