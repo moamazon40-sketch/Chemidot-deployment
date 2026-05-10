@@ -541,6 +541,8 @@ export interface Order {
   offerValidityDate?: string | null;
   proformaInvoiceUrl?: string | null;
   commercialInvoiceUrl?: string | null;
+  invoiceIssuedAt?: string | null;
+  invoiceStatus?: "not_issued" | "issued";
   orderDocumentNotes?: string | null;
   trackingNumber?: string | null;
   estimatedDelivery?: string | null;

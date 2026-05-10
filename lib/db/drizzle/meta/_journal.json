@@ -57,6 +57,13 @@
       "when": 1778458800000,
       "tag": "0007_order_invoice_documents",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1778462400000,
+      "tag": "0008_order_invoice_status",
+      "breakpoints": true
     }
   ]
 }

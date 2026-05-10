@@ -13,7 +13,7 @@ import {
 import { Label } from "@/components/ui/label";
 import {
   Package, Search, Truck, CheckCircle2, Clock, ArrowRight,
-  XCircle, Loader2, ShoppingBag,
+  XCircle, Loader2, ShoppingBag, FileText, ExternalLink,
 } from "lucide-react";
 import { statusColor, formatDate, formatCurrency } from "@/lib/formatters";
 import { useToast } from "@/hooks/use-toast";
@@ -29,6 +29,67 @@ const STATUS_META: Record<string, { label: string; icon: any; color: string }> =
   delivered:  { label: "Delivered",  icon: CheckCircle2, color: "bg-green-100 text-green-800" },
   cancelled:  { label: "Cancelled",  icon: XCircle,      color: "bg-red-100 text-red-800" },
 };
+
+const DEAL_STAGE_LABELS: Record<string, string> = {
+  buyer_accepted: "Buyer Accepted",
+  supplier_confirmed: "Supplier Confirmed",
+  admin_needs_review: "Needs Review",
+  admin_approved: "Deal Approved",
+  buyer_confirmed: "Final Order Confirmed",
+  invoice_issued: "Invoice Issued",
+  closed: "Closed",
+  cancelled: "Cancelled",
+};
+
+function InvoiceSection({ order }: { order: any }) {
+  const hasInvoice = Boolean(order.proformaInvoiceUrl || order.commercialInvoiceUrl);
+
+  if (!hasInvoice) {
+    return (
+      <div className="mt-4 rounded-md border border-dashed bg-muted/20 p-3 text-sm text-muted-foreground">
+        Invoice not issued yet.
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-4 rounded-md border bg-background p-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 font-medium">
+            <FileText className="h-4 w-4 text-primary" />
+            Invoice Documents
+            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+              {order.invoiceStatus === "issued" ? "Issued" : "Available"}
+            </Badge>
+          </div>
+          {order.invoiceIssuedAt && (
+            <p className="text-xs text-muted-foreground">Issued {formatDate(order.invoiceIssuedAt)}</p>
+          )}
+          {order.orderDocumentNotes && (
+            <p className="text-sm text-muted-foreground">{order.orderDocumentNotes}</p>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {order.proformaInvoiceUrl && (
+            <Button variant="outline" size="sm" asChild>
+              <a href={order.proformaInvoiceUrl} target="_blank" rel="noreferrer">
+                View Proforma <ExternalLink className="ml-1.5 h-3.5 w-3.5" />
+              </a>
+            </Button>
+          )}
+          {order.commercialInvoiceUrl && (
+            <Button variant="outline" size="sm" asChild>
+              <a href={order.commercialInvoiceUrl} target="_blank" rel="noreferrer">
+                View Commercial <ExternalLink className="ml-1.5 h-3.5 w-3.5" />
+              </a>
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function OrderStatusTimeline({ status }: { status: string }) {
   const currentIdx = STATUS_STEPS.indexOf(status);
@@ -232,7 +293,7 @@ function UpdateStatusDialog({ order, onUpdated }: {
             <div className="flex justify-end gap-2 pt-2 border-t">
               <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
               <Button onClick={isAvailabilityConfirmation ? handleConfirmAvailability : handleUpdate} disabled={updateStatus.isPending || confirmingAvailability}>
-                {updateStatus.isPending ? "Updating…" : next.label}
+                {updateStatus.isPending ? "Updating..." : next.label}
               </Button>
             </div>
           </div>
@@ -426,6 +487,11 @@ export default function Orders() {
                               <StatusIcon className="w-3 h-3 mr-1" />
                               {meta.label}
                             </Badge>
+                            {order.dealStage && (
+                              <Badge variant="outline">
+                                {DEAL_STAGE_LABELS[order.dealStage] ?? order.dealStage}
+                              </Badge>
+                            )}
                           </div>
 
                           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4 text-sm">
@@ -448,6 +514,7 @@ export default function Orders() {
                           </div>
 
                           <OrderStatusTimeline status={order.status} />
+                          <InvoiceSection order={order} />
                         </div>
 
                         <div className="flex flex-row md:flex-col items-center md:items-end justify-between md:justify-center gap-3 shrink-0 border-t md:border-t-0 pt-4 md:pt-0 mt-2 md:mt-0">

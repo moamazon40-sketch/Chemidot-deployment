@@ -19,6 +19,7 @@ export const dealStageEnum = pgEnum("deal_stage", [
   "cancelled",
 ]);
 export const paymentStatusEnum = pgEnum("payment_status", ["not_started", "pending", "confirmed"]);
+export const invoiceStatusEnum = pgEnum("invoice_status", ["not_issued", "issued"]);
 export const fulfillmentStatusEnum = pgEnum("fulfillment_status", [
   "not_started",
   "preparing",
@@ -53,6 +54,8 @@ export const ordersTable = pgTable("orders", {
   offerValidityDate: timestamp("offer_validity_date"),
   proformaInvoiceUrl: text("proforma_invoice_url"),
   commercialInvoiceUrl: text("commercial_invoice_url"),
+  invoiceIssuedAt: timestamp("invoice_issued_at"),
+  invoiceStatus: invoiceStatusEnum("invoice_status").notNull().default("not_issued"),
   orderDocumentNotes: text("order_document_notes"),
   trackingNumber: text("tracking_number"),
   estimatedDelivery: timestamp("estimated_delivery"),

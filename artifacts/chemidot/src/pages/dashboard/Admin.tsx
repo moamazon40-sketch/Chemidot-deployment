@@ -31,6 +31,7 @@ import {
   Plus,
   EyeOff,
   CreditCard,
+  ExternalLink,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect, useMemo, useState } from "react";
@@ -141,6 +142,8 @@ type OrderRow = {
   offerValidityDate?: string | null;
   proformaInvoiceUrl?: string | null;
   commercialInvoiceUrl?: string | null;
+  invoiceIssuedAt?: string | null;
+  invoiceStatus?: "not_issued" | "issued";
   orderDocumentNotes?: string | null;
   dealValue?: string | null;
   dealCurrency?: string | null;
@@ -843,6 +846,20 @@ export default function AdminDashboard() {
                           <TableCell>
                             <div className="font-medium">{row.productName || `Order #${row.id}`}</div>
                             <div className="text-xs text-muted-foreground">#{row.id} - {row.quantity} {row.unit} - <StatusBadge value={row.dealStage ?? row.status} /></div>
+                            {(row.proformaInvoiceUrl || row.commercialInvoiceUrl) && (
+                              <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                                {row.proformaInvoiceUrl && (
+                                  <a className="inline-flex items-center gap-1 text-primary hover:underline" href={row.proformaInvoiceUrl} target="_blank" rel="noreferrer">
+                                    Proforma <ExternalLink className="h-3 w-3" />
+                                  </a>
+                                )}
+                                {row.commercialInvoiceUrl && (
+                                  <a className="inline-flex items-center gap-1 text-primary hover:underline" href={row.commercialInvoiceUrl} target="_blank" rel="noreferrer">
+                                    Commercial <ExternalLink className="h-3 w-3" />
+                                  </a>
+                                )}
+                              </div>
+                            )}
                           </TableCell>
                           <TableCell>{row.buyer?.companyName || row.buyer?.email || "-"}</TableCell>
                           <TableCell>{row.supplier?.companyName ?? "-"}</TableCell>

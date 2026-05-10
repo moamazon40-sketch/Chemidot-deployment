@@ -206,6 +206,8 @@ async function buildOrderAdminRow(order: typeof ordersTable.$inferSelect, suppli
     offerValidityDate: toIso(order.offerValidityDate),
     proformaInvoiceUrl: order.proformaInvoiceUrl,
     commercialInvoiceUrl: order.commercialInvoiceUrl,
+    invoiceIssuedAt: toIso(order.invoiceIssuedAt),
+    invoiceStatus: order.invoiceStatus,
     orderDocumentNotes: order.orderDocumentNotes,
     deliveryAddress: order.deliveryAddress,
     dealValue: order.dealValue,

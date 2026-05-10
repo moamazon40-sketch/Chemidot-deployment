@@ -2063,6 +2063,12 @@ components:
         commercialInvoiceUrl:
           type: string
           nullable: true
+        invoiceIssuedAt:
+          type: string
+          nullable: true
+        invoiceStatus:
+          type: string
+          enum: [not_issued, issued]
         orderDocumentNotes:
           type: string
           nullable: true

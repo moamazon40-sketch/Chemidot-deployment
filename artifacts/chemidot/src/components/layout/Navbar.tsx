@@ -30,6 +30,12 @@ function NotificationsBell() {
     markAllRead.mutate(undefined, { onSuccess: () => refetch() });
   };
 
+  const notificationHref = (n: any) => {
+    if (n.relatedType === "order") return "/dashboard/orders";
+    if (n.relatedType === "rfq") return "/dashboard/rfqs";
+    return "/dashboard";
+  };
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -58,12 +64,14 @@ function NotificationsBell() {
           </div>
         ) : (
           notifications.slice(0, 8).map((n: any) => (
-            <DropdownMenuItem key={n.id} className="flex flex-col items-start gap-0.5 py-2.5 cursor-pointer">
-              <span className="font-medium text-sm">{n.title}</span>
-              <span className="text-xs text-muted-foreground line-clamp-2">{n.message}</span>
-              <span className="text-[10px] text-muted-foreground/60 mt-0.5">
-                {new Date(n.createdAt).toLocaleDateString()}
-              </span>
+            <DropdownMenuItem key={n.id} asChild>
+              <Link href={notificationHref(n)} className="flex flex-col items-start gap-0.5 py-2.5 cursor-pointer">
+                <span className="font-medium text-sm">{n.title}</span>
+                <span className="text-xs text-muted-foreground line-clamp-2">{n.message}</span>
+                <span className="text-[10px] text-muted-foreground/60 mt-0.5">
+                  {new Date(n.createdAt).toLocaleDateString()}
+                </span>
+              </Link>
             </DropdownMenuItem>
           ))
         )}
