@@ -3,6 +3,8 @@ import { db } from "@workspace/db";
 import {
   adminAuditLogsTable,
   categoriesTable,
+  collectiveOrderAllocationsTable,
+  collectiveOrderOffersTable,
   collectiveOrdersTable,
   notificationsTable,
   ordersTable,
@@ -766,17 +768,19 @@ router.patch("/admin/rfqs/:id/status", requireAuth, requireRole("admin"), asyncH
 }));
 
 router.get("/admin/collective-orders", requireAuth, requireRole("admin"), asyncHandler(async (req, res) => {
-  const { status, page = "1", limit = "50" } = req.query as any;
+  const { status, stage, page = "1", limit = "50" } = req.query as any;
   const pageNum = Math.max(1, parseInt(page));
   const limitNum = Math.min(200, Math.max(1, parseInt(limit)));
   const offset = (pageNum - 1) * limitNum;
   const conditions: any[] = [];
   if (status) conditions.push(eq(collectiveOrdersTable.status, status));
+  if (stage) conditions.push(eq(collectiveOrdersTable.collectiveStage, stage));
   const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
   const [rows, countResult] = await Promise.all([
     db.select().from(collectiveOrdersTable)
       .leftJoin(suppliersTable, eq(suppliersTable.id, collectiveOrdersTable.supplierId))
+      .leftJoin(usersTable, eq(usersTable.id, collectiveOrdersTable.createdByBuyerId))
       .where(whereClause)
       .orderBy(desc(collectiveOrdersTable.createdAt))
       .limit(limitNum)
@@ -786,7 +790,7 @@ router.get("/admin/collective-orders", requireAuth, requireRole("admin"), asyncH
 
   const total = countResult[0]?.count ?? 0;
   res.json({
-    collectiveOrders: rows.map((r: any) => ({ ...r.collective_orders, supplier: r.suppliers })),
+    collectiveOrders: rows.map((r: any) => ({ ...r.collective_orders, supplier: r.suppliers, leadBuyer: r.users })),
     total,
     page: pageNum,
     limit: limitNum,
@@ -802,6 +806,117 @@ router.patch("/admin/collective-orders/:id/status", requireAuth, requireRole("ad
     return;
   }
   const [updated] = await db.update(collectiveOrdersTable).set({ status: status as any, updatedAt: new Date() }).where(eq(collectiveOrdersTable.id, id)).returning();
+  if (!updated) {
+    res.status(404).json({ message: "Collective order not found" });
+    return;
+  }
+  res.json(updated);
+}));
+
+const collectiveStageValues = [
+  "gathering",
+  "offers_open",
+  "offer_selected",
+  "allocations_confirming",
+  "allocations_locked",
+  "supplier_confirmed",
+  "admin_review",
+  "admin_approved",
+  "execution",
+  "completed",
+  "cancelled",
+] as const;
+
+router.patch("/admin/collective-orders/:id/stage", requireAuth, requireRole("admin"), asyncHandler(async (req, res) => {
+  const id = parseInt(String(req.params.id));
+  const stage = String((req.body as any)?.stage ?? "");
+  if (!collectiveStageValues.includes(stage as any)) {
+    res.status(400).json({ message: "Invalid collective order stage" });
+    return;
+  }
+  const [updated] = await db.update(collectiveOrdersTable)
+    .set({ collectiveStage: stage as any, updatedAt: new Date() })
+    .where(eq(collectiveOrdersTable.id, id))
+    .returning();
+  if (!updated) {
+    res.status(404).json({ message: "Collective order not found" });
+    return;
+  }
+  res.json(updated);
+}));
+
+router.post("/admin/collective-orders/:id/open-offers", requireAuth, requireRole("admin"), asyncHandler(async (req, res) => {
+  const id = parseInt(String(req.params.id));
+  const [updated] = await db.update(collectiveOrdersTable)
+    .set({ collectiveStage: "offers_open", updatedAt: new Date() })
+    .where(eq(collectiveOrdersTable.id, id))
+    .returning();
+  if (!updated) {
+    res.status(404).json({ message: "Collective order not found" });
+    return;
+  }
+  res.json(updated);
+}));
+
+router.post("/admin/collective-orders/:id/approve-selected-offer", requireAuth, requireRole("admin"), asyncHandler(async (req, res) => {
+  const id = parseInt(String(req.params.id));
+  const offerId = Number((req.body as any)?.offerId);
+  if (!Number.isInteger(offerId)) {
+    res.status(400).json({ message: "offerId is required" });
+    return;
+  }
+  const [offer] = await db.select().from(collectiveOrderOffersTable)
+    .where(and(eq(collectiveOrderOffersTable.id, offerId), eq(collectiveOrderOffersTable.collectiveOrderId, id)))
+    .limit(1);
+  if (!offer) {
+    res.status(404).json({ message: "Supplier offer not found" });
+    return;
+  }
+  const [updated] = await db.update(collectiveOrdersTable)
+    .set({
+      selectedOfferId: offer.id,
+      supplierId: offer.supplierId,
+      currentPrice: offer.unitPrice,
+      collectiveStage: "allocations_confirming",
+      updatedAt: new Date(),
+    })
+    .where(eq(collectiveOrdersTable.id, id))
+    .returning();
+  res.json(updated);
+}));
+
+router.post("/admin/collective-orders/:id/lock-allocations", requireAuth, requireRole("admin"), asyncHandler(async (req, res) => {
+  const id = parseInt(String(req.params.id));
+  const [updated] = await db.update(collectiveOrdersTable)
+    .set({ isAllocationLocked: true, collectiveStage: "allocations_locked", updatedAt: new Date() })
+    .where(eq(collectiveOrdersTable.id, id))
+    .returning();
+  if (!updated) {
+    res.status(404).json({ message: "Collective order not found" });
+    return;
+  }
+  res.json(updated);
+}));
+
+router.post("/admin/collective-orders/:id/approve-allocation-sharing", requireAuth, requireRole("admin"), asyncHandler(async (req, res) => {
+  const id = parseInt(String(req.params.id));
+  const [updated] = await db.update(collectiveOrdersTable)
+    .set({ isAllocationSharingApproved: true, updatedAt: new Date() })
+    .where(eq(collectiveOrdersTable.id, id))
+    .returning();
+  if (!updated) {
+    res.status(404).json({ message: "Collective order not found" });
+    return;
+  }
+  res.json(updated);
+}));
+
+router.post("/admin/collective-orders/:id/approve-deal", requireAuth, requireRole("admin"), asyncHandler(async (req, res) => {
+  const id = parseInt(String(req.params.id));
+  const [updated] = await db.update(collectiveOrdersTable)
+    .set({ collectiveStage: "execution", updatedAt: new Date() })
+    .where(eq(collectiveOrdersTable.id, id))
+    .returning();
   if (!updated) {
     res.status(404).json({ message: "Collective order not found" });
     return;

@@ -47,7 +47,7 @@ function notificationTargetUrl(
   if (n.relatedType === "collective_order" && n.relatedId) {
     return user.role === "admin"
       ? "/admin?tab=collective"
-      : appendMode("/dashboard/collective", mode ?? "buy");
+      : `/collective-orders/${n.relatedId}`;
   }
   if (n.relatedType === "message") {
     return appendMode("/dashboard/messages", mode);

@@ -84,7 +84,7 @@ export function CreateCollectiveOrderDialog({ open, onOpenChange }: Props) {
         queryClient.invalidateQueries({ queryKey: getListCollectiveOrdersQueryKey({ status: "open" }) });
       },
       onError: (err: any) => {
-        const msg = err?.response?.data?.message || "Could not create the collective order. Make sure you are logged in as a supplier.";
+        const msg = err?.response?.data?.message || "Could not create the collective order. Make sure your account can buy.";
         toast({ title: "Failed to create order", description: msg, variant: "destructive" });
       },
     });

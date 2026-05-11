@@ -419,13 +419,31 @@ export const CollectiveOrderStatus = {
   fulfilled: "fulfilled",
 } as const;
 
+export type CollectiveOrderStage =
+  (typeof CollectiveOrderStage)[keyof typeof CollectiveOrderStage];
+
+export const CollectiveOrderStage = {
+  gathering: "gathering",
+  offers_open: "offers_open",
+  offer_selected: "offer_selected",
+  allocations_confirming: "allocations_confirming",
+  allocations_locked: "allocations_locked",
+  supplier_confirmed: "supplier_confirmed",
+  admin_review: "admin_review",
+  admin_approved: "admin_approved",
+  execution: "execution",
+  completed: "completed",
+  cancelled: "cancelled",
+} as const;
+
 export interface CollectiveOrder {
   id: number;
-  productId: number;
+  productId?: number | null;
   productName: string;
   productImageUrl?: string | null;
-  supplierId: number;
+  supplierId?: number | null;
   supplierName: string;
+  createdByBuyerId?: number | null;
   targetQuantity: number;
   currentQuantity: number;
   unit: string;
@@ -437,6 +455,12 @@ export interface CollectiveOrder {
   nextTierQuantity?: number | null;
   nextTierDiscount?: number | null;
   status: CollectiveOrderStatus;
+  collectiveStage?: CollectiveOrderStage;
+  targetPrice?: number | null;
+  recommendedOfferId?: number | null;
+  selectedOfferId?: number | null;
+  isAllocationLocked?: boolean;
+  isAllocationSharingApproved?: boolean;
   deadline: string;
   deliveryRegion: string;
   moqPerParticipant: number;
@@ -454,10 +478,52 @@ export interface CollectiveOrderParticipant {
   joinedAt: string;
 }
 
+export interface CollectiveOrderOffer {
+  id: number;
+  collectiveOrderId: number;
+  supplierId: number;
+  supplierName: string;
+  unitPrice: number;
+  currency: string;
+  availableQty: number;
+  leadTime: string;
+  incoterms: string[];
+  paymentTerms?: string | null;
+  deliveryModel: string;
+  deliveryCostMode: string;
+  validUntil?: string | null;
+  notes?: string | null;
+  createdAt?: string;
+}
+
+export interface CollectiveOrderAllocation {
+  id: number;
+  collectiveOrderId: number;
+  buyerId: number;
+  buyerCompanyName?: string;
+  finalQty: number;
+  unitPriceSnapshot: number;
+  subtotalSnapshot: number;
+  deliveryCity?: string | null;
+  deliveryAddress?: string | null;
+  contactName?: string | null;
+  contactPhone?: string | null;
+  contactEmail?: string | null;
+  confirmationStatus: string;
+  invoiceStatus: string;
+  paymentStatus: string;
+  fulfillmentStatus: string;
+  proformaInvoiceUrl?: string | null;
+  commercialInvoiceUrl?: string | null;
+}
+
 export type CollectiveOrderDetail = CollectiveOrder & {
-  product: Product;
+  product?: Product | null;
   pricingTiers: PricingTier[];
   participants: CollectiveOrderParticipant[];
+  deliveryRegionSummary?: string[];
+  offers?: CollectiveOrderOffer[];
+  allocations?: CollectiveOrderAllocation[];
   packagingOptions: string[];
   logisticsSavingsEstimate: number;
 };
@@ -829,6 +895,7 @@ export const ListRfqsStatus = {
 
 export type ListCollectiveOrdersParams = {
   status?: ListCollectiveOrdersStatus;
+  stage?: CollectiveOrderStage;
   categoryId?: number;
   region?: string;
   page?: number;

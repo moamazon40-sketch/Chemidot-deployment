@@ -47,15 +47,15 @@ const HOW_IT_WORKS = [
   {
     step: "03",
     icon: ShieldCheck,
-    title: "Pay Securely & Receive",
-    desc: "Once the order deadline hits and the target is reached, Chemidot coordinates fulfillment. Secure escrow protects your payment until delivery.",
+    title: "Review Offers & Confirm",
+    desc: "Suppliers submit offers, the lead buyer recommends a preferred offer, and Chemidot reviews the allocation before buyer details are shared.",
   },
 ];
 
 const BENEFITS = [
   { icon: TrendingDown, label: "Bulk pricing for growing orders" },
   { icon: Users,        label: "Pool demand with verified buyers" },
-  { icon: ShieldCheck,  label: "Escrow-protected payments" },
+  { icon: ShieldCheck,  label: "Chemidot-managed supplier review" },
   { icon: Zap,          label: "No minimum quantity to join" },
   { icon: BarChart3,    label: "Transparent pricing tiers" },
   { icon: Clock,        label: "Defined delivery deadlines" },
@@ -125,7 +125,7 @@ function QuickJoinDialog({ order, open, onOpenChange, onJoined }: QuickJoinDialo
         <DialogHeader>
           <DialogTitle className="text-xl">Join Collective Order</DialogTitle>
           <DialogDescription className="text-sm text-muted-foreground">
-            {order.productName} · <span className="font-medium">{order.supplierName}</span>
+            {order.productName} · <span className="font-medium">{order.supplierName || "Supplier offers pending"}</span>
           </DialogDescription>
         </DialogHeader>
 
@@ -473,7 +473,7 @@ export default function CollectiveOrders() {
                           {order.productName}
                         </h3>
                       </Link>
-                      <p className="text-sm text-muted-foreground truncate">by {order.supplierName}</p>
+                      <p className="text-sm text-muted-foreground truncate">{order.supplierName ? `by ${order.supplierName}` : "Supplier offers pending"}</p>
                     </CardHeader>
 
                     <CardContent className="p-5 pt-0 flex-1 space-y-4">

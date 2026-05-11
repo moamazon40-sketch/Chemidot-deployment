@@ -8,11 +8,30 @@ import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Users, Clock, ArrowLeft, Package, MapPin, TrendingDown, Target, Building2, HelpCircle } from "lucide-react";
 import { MotionCTAButton } from "@/components/MotionCTAButton";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/lib/auth";
+import { getStoredToken, useAuth } from "@/lib/auth";
+import { userCanSell } from "@/lib/account-capabilities";
+
+async function collectiveAction(path: string, body: unknown) {
+  const token = getStoredToken();
+  const res = await fetch(path, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => null);
+    throw new Error(data?.message || "Request failed");
+  }
+  return res.json();
+}
 
 export default function CollectiveOrderDetail() {
   const [, params] = useRoute("/collective-orders/:id");
@@ -23,8 +42,18 @@ export default function CollectiveOrderDetail() {
   
   const [quantity, setQuantity] = useState<number>(0);
   const [destination, setDestination] = useState("");
+  const [offerForm, setOfferForm] = useState({
+    unitPrice: "",
+    availableQty: "",
+    leadTime: "",
+    incoterms: "DAP",
+    paymentTerms: "",
+    deliveryModel: "to_be_agreed",
+    deliveryCostMode: "quoted_after_supplier_offer",
+    notes: "",
+  });
 
-  const { data: order, isLoading } = useGetCollectiveOrder(id, {
+  const { data: order, isLoading, refetch } = useGetCollectiveOrder(id, {
     query: { enabled: !!id } as any
   });
 
@@ -50,9 +79,41 @@ export default function CollectiveOrderDetail() {
             title: "Successfully Joined!",
             description: `You have committed to ${quantity} ${order?.unit}.`,
           });
+          refetch();
         }
       }
     );
+  };
+
+  const handleOfferSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await collectiveAction(`/api/collective-orders/${id}/offers`, {
+        unitPrice: Number(offerForm.unitPrice),
+        currency: "SAR",
+        availableQty: Number(offerForm.availableQty),
+        leadTime: offerForm.leadTime,
+        incoterms: offerForm.incoterms.split(",").map((v) => v.trim()).filter(Boolean),
+        paymentTerms: offerForm.paymentTerms || undefined,
+        deliveryModel: offerForm.deliveryModel,
+        deliveryCostMode: offerForm.deliveryCostMode,
+        notes: offerForm.notes || undefined,
+      });
+      toast({ title: "Offer submitted", description: "Chemidot and the lead buyer can now review it." });
+      refetch();
+    } catch (err: any) {
+      toast({ title: "Offer failed", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleRecommendOffer = async (offerId: number) => {
+    try {
+      await collectiveAction(`/api/collective-orders/${id}/recommend-offer`, { offerId });
+      toast({ title: "Offer recommended", description: "Chemidot Admin will review and approve the final selection." });
+      refetch();
+    } catch (err: any) {
+      toast({ title: "Could not recommend offer", description: err.message, variant: "destructive" });
+    }
   };
 
   if (isLoading) {
@@ -77,6 +138,10 @@ export default function CollectiveOrderDetail() {
   if (!order) return null;
 
   const progress = Math.min(100, (order.currentQuantity / order.targetQuantity) * 100);
+  const currency = order.product?.currency || order.offers?.[0]?.currency || "SAR";
+  const stage = order.collectiveStage || "gathering";
+  const isLeadBuyer = user?.id && order.createdByBuyerId === user.id;
+  const canSubmitOffer = userCanSell(user) && stage === "offers_open";
 
   return (
     <MainLayout>
@@ -110,9 +175,15 @@ export default function CollectiveOrderDetail() {
                   </Badge>
                 </div>
                 <h1 className="text-3xl font-bold tracking-tight">{order.productName}</h1>
-                <Link href={`/suppliers/${order.supplierId}`} className="text-muted-foreground hover:text-primary flex items-center gap-1.5 w-fit">
-                  <Building2 className="w-4 h-4" /> {order.supplierName}
-                </Link>
+                {order.supplierId ? (
+                  <Link href={`/suppliers/${order.supplierId}`} className="text-muted-foreground hover:text-primary flex items-center gap-1.5 w-fit">
+                    <Building2 className="w-4 h-4" /> {order.supplierName}
+                  </Link>
+                ) : (
+                  <div className="text-muted-foreground flex items-center gap-1.5">
+                    <Building2 className="w-4 h-4" /> Supplier offers pending
+                  </div>
+                )}
               </div>
             </div>
 
@@ -148,6 +219,19 @@ export default function CollectiveOrderDetail() {
               </CardContent>
             </Card>
 
+            <Card>
+              <CardContent className="p-5 space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="outline">Stage: {stage.replace(/_/g, " ")}</Badge>
+                  <Badge variant="secondary">Lead buyer managed</Badge>
+                  <Badge variant="secondary">Admin protected</Badge>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  The collective price applies to the product unit price. Delivery costs may vary based on each buyer's location unless the supplier includes delivery in the offer.
+                </p>
+              </CardContent>
+            </Card>
+
             {/* Pricing Tiers */}
             <div className="space-y-4">
               <h2 className="text-xl font-bold flex items-center gap-2">
@@ -169,7 +253,7 @@ export default function CollectiveOrderDetail() {
                         </CardDescription>
                       </CardHeader>
                       <CardContent>
-                        <div className="text-2xl font-bold">{order.product.currency} {tier.pricePerUnit.toLocaleString()}</div>
+                        <div className="text-2xl font-bold">{currency} {tier.pricePerUnit.toLocaleString()}</div>
                         <div className="text-sm text-green-600 font-medium mt-1">-{tier.discountPercent}% from base</div>
                       </CardContent>
                     </Card>
@@ -177,10 +261,94 @@ export default function CollectiveOrderDetail() {
                 })}
               </div>
             </div>
+
+            {canSubmitOffer && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Submit Supplier Offer</CardTitle>
+                  <CardDescription>Buyer details stay private until Chemidot locks and approves allocation sharing.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handleOfferSubmit} className="grid sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Unit Price (SAR)</Label>
+                      <Input type="number" min="0.01" step="0.01" value={offerForm.unitPrice} onChange={(e) => setOfferForm(v => ({ ...v, unitPrice: e.target.value }))} required />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Available Quantity ({order.unit})</Label>
+                      <Input type="number" min="0.01" step="0.01" value={offerForm.availableQty} onChange={(e) => setOfferForm(v => ({ ...v, availableQty: e.target.value }))} required />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Lead Time</Label>
+                      <Input placeholder="e.g. 14 days" value={offerForm.leadTime} onChange={(e) => setOfferForm(v => ({ ...v, leadTime: e.target.value }))} required />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Incoterms</Label>
+                      <Input placeholder="DAP, CIF, DDP" value={offerForm.incoterms} onChange={(e) => setOfferForm(v => ({ ...v, incoterms: e.target.value }))} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Delivery Model</Label>
+                      <select className="w-full h-10 rounded-md border bg-background px-3 text-sm" value={offerForm.deliveryModel} onChange={(e) => setOfferForm(v => ({ ...v, deliveryModel: e.target.value }))}>
+                        <option value="supplier_delivery_to_each_buyer">Supplier delivery to each buyer</option>
+                        <option value="one_delivery_hub">One delivery hub</option>
+                        <option value="buyer_pickup">Buyer pickup</option>
+                        <option value="to_be_agreed">To be agreed</option>
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Delivery Cost</Label>
+                      <select className="w-full h-10 rounded-md border bg-background px-3 text-sm" value={offerForm.deliveryCostMode} onChange={(e) => setOfferForm(v => ({ ...v, deliveryCostMode: e.target.value }))}>
+                        <option value="included">Included</option>
+                        <option value="separate_per_buyer">Separate per buyer</option>
+                        <option value="quoted_after_supplier_offer">Quoted after supplier offer</option>
+                        <option value="one_hub_delivery">One hub delivery</option>
+                      </select>
+                    </div>
+                    <div className="sm:col-span-2 space-y-2">
+                      <Label>Payment Terms</Label>
+                      <Input placeholder="e.g. 50% advance, balance before delivery" value={offerForm.paymentTerms} onChange={(e) => setOfferForm(v => ({ ...v, paymentTerms: e.target.value }))} />
+                    </div>
+                    <div className="sm:col-span-2 space-y-2">
+                      <Label>Notes</Label>
+                      <Textarea value={offerForm.notes} onChange={(e) => setOfferForm(v => ({ ...v, notes: e.target.value }))} />
+                    </div>
+                    <Button type="submit" className="sm:col-span-2">Submit Offer</Button>
+                  </form>
+                </CardContent>
+              </Card>
+            )}
+
+            {(order.offers?.length ?? 0) > 0 && (
+              <div className="space-y-4">
+                <h2 className="text-xl font-bold">Supplier Offers</h2>
+                <div className="grid gap-4">
+                  {order.offers?.map((offer) => (
+                    <Card key={offer.id} className={order.recommendedOfferId === offer.id ? "border-primary" : ""}>
+                      <CardContent className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div>
+                          <div className="font-semibold">{offer.supplierName}</div>
+                          <div className="text-sm text-muted-foreground">
+                            {offer.currency} {offer.unitPrice.toLocaleString()} / {order.unit} · {offer.availableQty.toLocaleString()} {order.unit} available · {offer.leadTime}
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            Delivery: {offer.deliveryCostMode.replace(/_/g, " ")} · {offer.incoterms.join(", ") || "Incoterms on request"}
+                          </div>
+                        </div>
+                        {isLeadBuyer && (
+                          <Button variant={order.recommendedOfferId === offer.id ? "secondary" : "outline"} onClick={() => handleRecommendOffer(offer.id)}>
+                            {order.recommendedOfferId === offer.id ? "Recommended" : "Recommend Offer"}
+                          </Button>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            )}
             
             {/* Participants */}
             <div className="space-y-4">
-              <h2 className="text-xl font-bold">Recent Participants</h2>
+              <h2 className="text-xl font-bold">Demand Summary</h2>
               <Card>
                 <div className="divide-y">
                   {order.participants.map(p => (
@@ -223,7 +391,7 @@ export default function CollectiveOrderDetail() {
                   <div className="bg-primary/5 rounded-lg p-4 space-y-3">
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Current Unit Price</span>
-                      <span className="font-bold">{order.product.currency} {order.currentPrice.toLocaleString()}</span>
+                      <span className="font-bold">{currency} {order.currentPrice.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Minimum Commitment</span>
@@ -231,7 +399,7 @@ export default function CollectiveOrderDetail() {
                     </div>
                     <div className="flex justify-between text-sm border-t border-primary/10 pt-2">
                       <span className="text-muted-foreground flex items-center gap-1">Est. Savings <HelpCircle className="w-3 h-3"/></span>
-                      <span className="font-bold text-green-600">{order.product.currency} {order.estimatedSavingsPerTon}/ton</span>
+                      <span className="font-bold text-green-600">{currency} {order.estimatedSavingsPerTon}/ton</span>
                     </div>
                   </div>
 
@@ -266,7 +434,7 @@ export default function CollectiveOrderDetail() {
                     <div className="pt-4 border-t">
                       <div className="flex justify-between items-center mb-1">
                         <span className="font-medium">Estimated Total</span>
-                        <span className="text-xl font-bold text-primary">{order.product.currency} {(quantity * order.currentPrice).toLocaleString()}</span>
+                        <span className="text-xl font-bold text-primary">{currency} {(quantity * order.currentPrice).toLocaleString()}</span>
                       </div>
                       <p className="text-xs text-muted-foreground text-right">Price may decrease if higher tiers are reached</p>
                     </div>

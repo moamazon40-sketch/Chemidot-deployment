@@ -71,6 +71,13 @@
       "when": 1778500800000,
       "tag": "0009_user_capabilities",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1778522400000,
+      "tag": "0010_buyer_led_collective_orders",
+      "breakpoints": true
     }
   ]
 }

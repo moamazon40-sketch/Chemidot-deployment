@@ -56,7 +56,7 @@ function CreateCollectiveOrderDialog({ onCreated }: { onCreated: () => void }) {
       }
     }, {
       onSuccess: () => {
-        toast({ title: "Collective order created!", description: "Buyers can now join your order." });
+        toast({ title: "Collective order created!", description: "Other buyers can now join your order." });
         setOpen(false);
         setForm({ productName: "", targetQuantity: "", unit: "MT", moqPerParticipant: "10", basePrice: "", tier2Qty: "", tier2Discount: "", tier3Qty: "", tier3Discount: "", deadline: "", deliveryRegion: "Saudi Arabia" });
         onCreated();
@@ -140,8 +140,8 @@ export default function DashboardCollective() {
   const { data, isLoading, refetch } = useListCollectiveOrders({ limit: 20 });
   const myOrders = (data?.collectiveOrders ?? []).filter((o: any) =>
     isSupplier
-      ? o.supplierId != null  // supplier sees orders they created
-      : o.participants?.some((p: any) => p.userId === user?.id) // buyer sees orders they joined
+      ? o.collectiveStage === "offers_open"
+      : o.createdByBuyerId === user?.id
   );
 
   const getStatusColor = (status: string) => {
@@ -160,22 +160,22 @@ export default function DashboardCollective() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Collective Orders</h1>
             <p className="text-muted-foreground">
-              {isSupplier ? "Manage your group buying listings." : "Track your group buying participation."}
+              {isSupplier ? "Review buyer-led collective demand and submit offers." : "Track collective orders you created or joined."}
             </p>
           </div>
           <div className="flex gap-2">
             <Link href="/collective-orders">
               <Button variant="outline" className="gap-2">Browse Open Orders <ArrowRight className="w-4 h-4" /></Button>
             </Link>
-            {isSupplier && <CreateCollectiveOrderDialog onCreated={refetch} />}
+            {!isSupplier && <CreateCollectiveOrderDialog onCreated={refetch} />}
           </div>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>{isSupplier ? "My Collective Listings" : "My Participations"}</CardTitle>
+            <CardTitle>{isSupplier ? "Open Collective Opportunities" : "My Collective Orders"}</CardTitle>
             <CardDescription>
-              {isSupplier ? "Collective orders you have created." : "Collective orders you have joined."}
+              {isSupplier ? "Buyer-led demand that is open for supplier offers." : "Collective orders where you are the lead buyer."}
             </CardDescription>
           </CardHeader>
           <CardContent className="p-0">
@@ -187,15 +187,15 @@ export default function DashboardCollective() {
               <div className="p-12 text-center flex flex-col items-center">
                 <Users className="w-12 h-12 text-muted-foreground/30 mb-4" />
                 <h3 className="text-lg font-medium">
-                  {isSupplier ? "No collective orders created yet" : "No active participations"}
+                  {isSupplier ? "No open collective opportunities" : "No collective orders yet"}
                 </h3>
                 <p className="text-muted-foreground mt-1 mb-4 max-w-md">
                   {isSupplier
-                    ? "Create a collective order to let multiple buyers pool their purchases for better pricing."
-                    : "You haven't joined any collective orders yet. Group buying allows you to access bulk pricing."}
+                    ? "When Chemidot opens buyer-led collective demand for supplier offers, it will appear here."
+                    : "Create a collective order to pool demand with other buyers and invite supplier offers."}
                 </p>
                 {isSupplier
-                  ? <CreateCollectiveOrderDialog onCreated={refetch} />
+                  ? <Link href="/collective-orders"><Button variant="outline" className="gap-2">Browse Collective Orders <ArrowRight className="w-4 h-4" /></Button></Link>
                   : <Link href="/collective-orders"><Button variant="outline" className="gap-2">Explore Collective Orders <ArrowRight className="w-4 h-4" /></Button></Link>
                 }
               </div>
@@ -205,7 +205,7 @@ export default function DashboardCollective() {
                   <div key={order.id} className="p-4 md:p-6 hover:bg-muted/30 transition-colors flex flex-col sm:flex-row justify-between sm:items-center gap-4">
                     <div className="space-y-1">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-semibold">{order.title}</span>
+                        <span className="font-semibold">{order.productName}</span>
                         <Badge variant="outline" className={`border-transparent ${getStatusColor(order.status)}`}>
                           {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
                         </Badge>
@@ -213,7 +213,7 @@ export default function DashboardCollective() {
                       <div className="text-sm text-muted-foreground flex flex-wrap items-center gap-2">
                         <span>{order.currentQuantity ?? 0} / {order.targetQuantity} {order.unit}</span>
                         <span>•</span>
-                        <span>{order.currency} {order.pricePerUnit}/unit</span>
+                        <span>{order.currentPrice ? `SAR ${order.currentPrice}/unit` : "Offer pending"}</span>
                         <span>•</span>
                         <span>{order.participantCount ?? 0} participants</span>
                         {order.deadline && (

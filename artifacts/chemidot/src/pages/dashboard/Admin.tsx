@@ -117,7 +117,9 @@ type CollectiveOrderRow = {
   currentQuantity: string;
   unit: string;
   status: string;
+  collectiveStage?: string;
   supplier?: SupplierRow | null;
+  leadBuyer?: { email?: string; companyName?: string | null } | null;
   createdAt?: string;
 };
 
@@ -971,23 +973,25 @@ export default function AdminDashboard() {
               <CardContent>
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead>Order</TableHead>
-                      <TableHead>Supplier</TableHead>
-                      <TableHead>Progress</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
+                      <TableRow>
+                        <TableHead>Order</TableHead>
+                        <TableHead>Lead Buyer</TableHead>
+                        <TableHead>Supplier</TableHead>
+                        <TableHead>Progress</TableHead>
+                      <TableHead>Stage</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filtered.collectiveOrders.length === 0 ? <EmptyRow colSpan={5} label="No collective orders found." /> : filtered.collectiveOrders.map((row) => (
+                    {filtered.collectiveOrders.length === 0 ? <EmptyRow colSpan={6} label="No collective orders found." /> : filtered.collectiveOrders.map((row) => (
                       <TableRow key={row.id}>
                         <TableCell className="font-medium">{row.productName}</TableCell>
+                        <TableCell>{row.leadBuyer?.companyName || row.leadBuyer?.email || "-"}</TableCell>
                         <TableCell>{row.supplier?.companyName ?? "-"}</TableCell>
                         <TableCell>{row.currentQuantity} / {row.targetQuantity} {row.unit}</TableCell>
-                        <TableCell><StatusBadge value={row.status} /></TableCell>
+                        <TableCell><StatusBadge value={row.collectiveStage || row.status} /></TableCell>
                         <TableCell className="text-right">
-                          <SmallSelect value={row.status} onChange={(status) => updateStatus(`/api/admin/collective-orders/${row.id}/status`, status, "Collective order")} options={["open", "closing_soon", "closed", "fulfilled"]} />
+                          <SmallSelect value={row.collectiveStage || "gathering"} onChange={(stage) => updateStatus(`/api/admin/collective-orders/${row.id}/stage`, stage, "Collective order")} options={["gathering", "offers_open", "offer_selected", "allocations_confirming", "allocations_locked", "supplier_confirmed", "admin_review", "admin_approved", "execution", "completed", "cancelled"]} />
                         </TableCell>
                       </TableRow>
                     ))}
