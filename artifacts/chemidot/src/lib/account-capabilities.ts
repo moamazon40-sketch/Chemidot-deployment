@@ -47,6 +47,17 @@ export function withDashboardMode(path: string, mode: DashboardMode): string {
   return hash ? `${next}#${hash}` : next;
 }
 
+export function withDashboardModeFromParts(
+  pathname: string,
+  search: string,
+  mode: DashboardMode,
+): string {
+  const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
+  params.set("mode", mode);
+  const query = params.toString();
+  return query ? `${pathname}?${query}` : pathname;
+}
+
 function isKnownDashboardPath(pathname: string): boolean {
   return SHARED_DASHBOARD_PATHS.has(pathname)
     || BUY_ONLY_DASHBOARD_PATHS.has(pathname)
@@ -67,8 +78,11 @@ export function getSafeDashboardModeRoute(
 ): string {
   if (user?.role === "admin") return "/admin";
 
-  const normalizedPath = currentPath.startsWith("/dashboard") ? currentPath : "/dashboard";
-  const preferredMode = getPreferredDashboardMode(user, currentSearch);
+  const [pathOnly, pathQuery = ""] = currentPath.split("?");
+  const normalizedPath = pathOnly.startsWith("/dashboard") ? pathOnly : "/dashboard";
+  const normalizedSearch = currentSearch || (pathQuery ? `?${pathQuery}` : "");
+
+  const preferredMode = getPreferredDashboardMode(user, normalizedSearch);
   const targetAllowed = targetMode === "buy" ? userCanBuy(user) : userCanSell(user);
   const safeTargetMode = targetAllowed ? targetMode : preferredMode;
 
@@ -80,5 +94,5 @@ export function getSafeDashboardModeRoute(
     return getDashboardOverviewRoute(safeTargetMode);
   }
 
-  return withDashboardMode(normalizedPath + currentSearch, safeTargetMode);
+  return withDashboardModeFromParts(normalizedPath, normalizedSearch, safeTargetMode);
 }

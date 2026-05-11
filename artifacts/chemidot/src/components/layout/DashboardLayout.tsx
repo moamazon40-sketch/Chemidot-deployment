@@ -130,7 +130,7 @@ function buildNavGroups(user: any, mode: DashboardMode, t: Record<string, any>, 
 
 function AppSidebar({ groups, mode }: { groups: NavGroup[]; mode: DashboardMode }) {
   const { state } = useSidebar();
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   const search = useSearch();
   const { logout, user } = useAuth();
   const isCollapsed = state === "collapsed";
@@ -159,6 +159,10 @@ function AppSidebar({ groups, mode }: { groups: NavGroup[]; mode: DashboardMode 
               <div className="mt-2 grid grid-cols-2 gap-1 rounded-lg border border-sidebar-border/60 bg-sidebar-accent/40 p-1">
                 <Link
                   href={buySwitchHref}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    navigate(buySwitchHref);
+                  }}
                   className={cn(
                     "rounded-md px-2 py-1 text-center text-[11px] font-medium",
                     mode === "buy" ? "bg-background text-foreground shadow-sm" : "text-sidebar-foreground/70"
@@ -168,6 +172,10 @@ function AppSidebar({ groups, mode }: { groups: NavGroup[]; mode: DashboardMode 
                 </Link>
                 <Link
                   href={sellSwitchHref}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    navigate(sellSwitchHref);
+                  }}
                   className={cn(
                     "rounded-md px-2 py-1 text-center text-[11px] font-medium",
                     mode === "sell" ? "bg-background text-foreground shadow-sm" : "text-sidebar-foreground/70"
@@ -233,7 +241,7 @@ function AppSidebar({ groups, mode }: { groups: NavGroup[]; mode: DashboardMode 
 function TopNav() {
   const { user, logout } = useAuth();
   const search = useSearch();
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
 
   const initials = user
     ? `${user.firstName?.[0] ?? ""}${user.lastName?.[0] ?? ""}`.toUpperCase() || "U"
@@ -261,7 +269,13 @@ function TopNav() {
       <div className="flex items-center gap-2">
         {dualMode && (
           <Button variant="outline" size="sm" asChild className="hidden sm:inline-flex gap-1.5">
-            <Link href={switchTarget}>
+            <Link
+              href={switchTarget}
+              onClick={(event) => {
+                event.preventDefault();
+                navigate(switchTarget);
+              }}
+            >
               <ArrowLeftRight className="h-3.5 w-3.5" />
               {mode === "buy" ? "Switch to Selling" : "Switch to Buying"}
             </Link>
