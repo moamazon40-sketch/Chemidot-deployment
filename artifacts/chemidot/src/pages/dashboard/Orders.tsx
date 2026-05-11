@@ -1,5 +1,6 @@
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { getStoredToken, useAuth } from "@/lib/auth";
+import { getPreferredDashboardMode, userCanBuy, userCanSell } from "@/lib/account-capabilities";
 import { useListOrders, useUpdateOrderStatus } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -144,8 +145,8 @@ function UpdateStatusDialog({ order, onUpdated }: {
     offerValidityDate: order.offerValidityDate ? String(order.offerValidityDate).slice(0, 10) : "",
   });
 
-  const isSupplier = user?.role === "supplier";
-  const isBuyer = user?.role === "buyer";
+  const isSupplier = userCanSell(user);
+  const isBuyer = userCanBuy(user);
 
   const NEXT_STATUS: Record<string, { label: string; role: string }> = {
     pending:    { label: order.dealStage === "buyer_accepted" ? "Confirm Availability" : "Confirm Order", role: "supplier" },
@@ -308,7 +309,7 @@ function BuyerFinalConfirmButton({ order, onUpdated }: { order: any; onUpdated: 
   const { user } = useAuth();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  if (user?.role !== "buyer" || order.dealStage !== "admin_approved") return null;
+  if (!userCanBuy(user) || order.dealStage !== "admin_approved") return null;
 
   const handleConfirm = async () => {
     if (!confirm("Confirm this final order? Supplier and Chemidot admin will be notified.")) return;
@@ -348,7 +349,7 @@ function SupplierInvoiceButton({ order, onUpdated }: { order: any; onUpdated: ()
     commercialInvoiceUrl: order.commercialInvoiceUrl ?? "",
     orderDocumentNotes: order.orderDocumentNotes ?? "",
   });
-  if (user?.role !== "supplier" || order.dealStage !== "buyer_confirmed") return null;
+  if (!userCanSell(user) || order.dealStage !== "buyer_confirmed") return null;
 
   const handleSubmit = async () => {
     if (!form.proformaInvoiceUrl.trim()) {
@@ -409,7 +410,10 @@ function SupplierInvoiceButton({ order, onUpdated }: { order: any; onUpdated: ()
 export default function Orders() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const { data, isLoading, refetch } = useListOrders();
+  const search = window.location.search;
+  const mode = getPreferredDashboardMode(user, search);
+  const isSellingView = mode === "sell";
+  const { data, isLoading, refetch } = useListOrders({ view: isSellingView ? "sell" : "buy" });
   const [statusFilter, setStatusFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -450,7 +454,7 @@ export default function Orders() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Orders</h1>
             <p className="text-muted-foreground">
-              {user?.role === "supplier"
+              {isSellingView
                 ? "Manage and fulfill your customer orders."
                 : "Track and manage your order history."}
             </p>
@@ -488,7 +492,7 @@ export default function Orders() {
                 <ShoppingBag className="w-12 h-12 text-muted-foreground/30 mb-4" />
                 <h3 className="text-lg font-medium">No orders found</h3>
                 <p className="text-muted-foreground mt-1">
-                  {user?.role === "supplier"
+                  {isSellingView
                     ? "You haven't received any orders yet."
                     : "You don't have any orders matching the current filter."}
                 </p>
@@ -521,7 +525,7 @@ export default function Orders() {
                               <div className="font-mono">#{order.id.toString().padStart(6, '0')}</div>
                             </div>
                             <div>
-                              <div className="text-muted-foreground text-xs">{user?.role === 'buyer' ? 'Supplier' : 'Buyer'}</div>
+                              <div className="text-muted-foreground text-xs">{isSellingView ? 'Buyer' : 'Supplier'}</div>
                               <div className="truncate">{order.supplierName}</div>
                             </div>
                             <div>

@@ -33,6 +33,8 @@ export interface User {
   id: number;
   email: string;
   role: UserRole;
+  canBuy: boolean;
+  canSell: boolean;
   firstName: string;
   lastName: string;
   companyName: string;
@@ -56,10 +58,20 @@ export const RegisterBodyRole = {
   supplier: "supplier",
 } as const;
 
+export type RegisterBodyAccountMode =
+  (typeof RegisterBodyAccountMode)[keyof typeof RegisterBodyAccountMode];
+
+export const RegisterBodyAccountMode = {
+  buyer: "buyer",
+  supplier: "supplier",
+  both: "both",
+} as const;
+
 export interface RegisterBody {
   email: string;
   password: string;
-  role: RegisterBodyRole;
+  role?: RegisterBodyRole;
+  accountMode?: RegisterBodyAccountMode;
   firstName: string;
   lastName: string;
   companyName: string;
@@ -800,6 +812,7 @@ export type ListProjectsParams = {
 
 export type ListRfqsParams = {
   status?: ListRfqsStatus;
+  view?: "buy" | "sell";
   page?: number;
   limit?: number;
 };
@@ -834,6 +847,7 @@ export const ListCollectiveOrdersStatus = {
 
 export type ListOrdersParams = {
   status?: ListOrdersStatus;
+  view?: "buy" | "sell";
   page?: number;
   limit?: number;
 };

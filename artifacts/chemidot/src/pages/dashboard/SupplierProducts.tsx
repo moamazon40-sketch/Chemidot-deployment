@@ -1,5 +1,6 @@
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/lib/auth";
+import { userCanSell } from "@/lib/account-capabilities";
 import { useListProducts, useDeleteProduct, useCreateProduct, useListCategories, useUpdateProduct } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -632,7 +633,7 @@ export default function SupplierProducts() {
   const [loadingSupplierId, setLoadingSupplierId] = useState(false);
 
   useEffect(() => {
-    if (user?.role !== "supplier") return;
+    if (!userCanSell(user)) return;
     let cancelled = false;
 
     const loadSupplierProfile = async () => {
@@ -662,7 +663,7 @@ export default function SupplierProducts() {
     return () => {
       cancelled = true;
     };
-  }, [user?.role, toast]);
+  }, [toast, user]);
 
   const { data, isLoading, refetch } = useListProducts(
     supplierId ? { supplierId, limit: 50 } : undefined,

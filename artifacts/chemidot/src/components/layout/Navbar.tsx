@@ -19,6 +19,7 @@ import { useLocation as useWouterLocation } from "wouter";
 import { useLanguage } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { getStoredToken } from "@/lib/storage";
+import { getPreferredDashboardMode, userCanBuy, userCanSell, withDashboardMode } from "@/lib/account-capabilities";
 import { useQueryClient } from "@tanstack/react-query";
 import logoImage from "@assets/Copy_of_Untitled_Design_(1)_1777886080670.png";
 
@@ -31,6 +32,9 @@ function NotificationsBell() {
   const { data: notifications, refetch } = useListNotifications({ unreadOnly: true });
   const markAllRead = useMarkAllNotificationsRead();
   const unreadCount = notifications?.length ?? 0;
+  const search = window.location.search;
+  const mode = getPreferredDashboardMode(user, search);
+  const dualMode = userCanBuy(user) && userCanSell(user) && user?.role !== "admin";
 
   const handleMarkAll = () => {
     markAllRead.mutate(undefined, {
@@ -41,17 +45,21 @@ function NotificationsBell() {
     });
   };
 
-  const fallbackHref = () => (user?.role === "admin" ? "/admin" : "/dashboard");
+  const fallbackHref = () => (user?.role === "admin" ? "/admin" : withDashboardMode("/dashboard", mode));
 
   const notificationHref = (n: any) => {
     if (n.targetUrl) return n.targetUrl;
     if (n.relatedType === "rfq" && n.relatedId) {
-      return user?.role === "admin" ? "/admin?tab=rfqs" : `/dashboard/rfqs/${n.relatedId}`;
+      return user?.role === "admin"
+        ? "/admin?tab=rfqs"
+        : withDashboardMode(`/dashboard/rfqs/${n.relatedId}`, dualMode ? "sell" : mode);
     }
     if (n.relatedType === "order" && n.relatedId) {
-      return user?.role === "admin" ? "/admin?tab=orders" : `/dashboard/orders?orderId=${n.relatedId}`;
+      return user?.role === "admin"
+        ? "/admin?tab=orders"
+        : withDashboardMode(`/dashboard/orders?orderId=${n.relatedId}`, dualMode ? "sell" : mode);
     }
-    if (n.relatedType === "message") return "/dashboard/messages";
+    if (n.relatedType === "message") return withDashboardMode("/dashboard/messages", mode);
     return fallbackHref();
   };
 

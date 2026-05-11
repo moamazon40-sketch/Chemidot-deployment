@@ -6,7 +6,7 @@ import {
   collectiveOrdersTable, notificationsTable, quotationsTable
 } from "@workspace/db";
 import { eq, and, sql, desc, gte, inArray, or, ilike, ne } from "drizzle-orm";
-import { requireAuth, requireRole } from "../middlewares/auth";
+import { canUserBuy, requireAuth, requireCanSell } from "../middlewares/auth";
 import { asyncHandler } from "../middlewares/asyncHandler";
 import { hasReachedProductLimit } from "../lib/subscriptions";
 
@@ -77,6 +77,10 @@ async function getSupplierActiveRfqCount(supplier: typeof suppliersTable.$inferS
 
 router.get("/dashboard/buyer-stats", requireAuth, asyncHandler(async (req, res) => {
   const user = (req as any).user;
+  if (!canUserBuy(user)) {
+    res.status(403).json({ message: "Buying capability is required for this view." });
+    return;
+  }
 
   const [rfqCount, orderCount, collectiveJoined, unreadMsgs] = await Promise.all([
     db.select({ count: sql<number>`cast(count(*) as int)` }).from(rfqsTable).where(eq(rfqsTable.buyerId, user.id)),
@@ -158,7 +162,7 @@ router.get("/dashboard/buyer-stats", requireAuth, asyncHandler(async (req, res) 
   });
 }));
 
-router.get("/dashboard/supplier-stats", requireAuth, requireRole("supplier", "admin"), asyncHandler(async (req, res) => {
+router.get("/dashboard/supplier-stats", requireAuth, requireCanSell, asyncHandler(async (req, res) => {
   const user = (req as any).user;
   const [supplier] = await db.select().from(suppliersTable).where(eq(suppliersTable.userId, user.id)).limit(1);
 
@@ -319,7 +323,7 @@ router.get("/dashboard/marketplace-stats", asyncHandler(async (_req, res) => {
       .leftJoin(suppliersTable, eq(suppliersTable.id, productsTable.supplierId))
       .where(and(eq(suppliersTable.storefrontVisible, true), eq(suppliersTable.productsPublic, true))),
     db.select({ count: sql<number>`cast(count(*) as int)` }).from(suppliersTable).where(eq(suppliersTable.storefrontVisible, true)),
-    db.select({ count: sql<number>`cast(count(*) as int)` }).from(usersTable).where(eq(usersTable.role, "buyer")),
+    db.select({ count: sql<number>`cast(count(*) as int)` }).from(usersTable).where(eq(usersTable.canBuy, true)),
     db.select({ count: sql<number>`cast(count(*) as int)` }).from(collectiveOrdersTable).where(eq(collectiveOrdersTable.status, "open")),
     db.select({ count: sql<number>`cast(count(*) as int)` }).from(ordersTable),
   ]);

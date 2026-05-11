@@ -520,6 +520,11 @@ paths:
       tags: [rfqs]
       summary: List RFQs (buyer sees own, supplier sees received)
       parameters:
+        - name: view
+          in: query
+          schema:
+            type: string
+            enum: [buy, sell]
         - name: status
           in: query
           schema:
@@ -884,6 +889,11 @@ paths:
       tags: [orders]
       summary: List orders
       parameters:
+        - name: view
+          in: query
+          schema:
+            type: string
+            enum: [buy, sell]
         - name: status
           in: query
           schema:
@@ -1300,6 +1310,9 @@ components:
         role:
           type: string
           enum: [buyer, supplier]
+        accountMode:
+          type: string
+          enum: [buyer, supplier, both]
         firstName:
           type: string
         lastName:
@@ -1316,7 +1329,7 @@ components:
           type: string
         warehouseLocation:
           type: string
-      required: [email, password, role, firstName, lastName, companyName, country]
+      required: [email, password, firstName, lastName, companyName, country]
 
     LoginBody:
       type: object
@@ -1337,6 +1350,10 @@ components:
         role:
           type: string
           enum: [buyer, supplier, admin]
+        canBuy:
+          type: boolean
+        canSell:
+          type: boolean
         firstName:
           type: string
         lastName:
@@ -1355,7 +1372,7 @@ components:
           enum: [active, suspended, pending_verification]
         createdAt:
           type: string
-      required: [id, email, role, firstName, lastName, companyName, country, status, createdAt]
+      required: [id, email, role, canBuy, canSell, firstName, lastName, companyName, country, status, createdAt]
 
     Category:
       type: object

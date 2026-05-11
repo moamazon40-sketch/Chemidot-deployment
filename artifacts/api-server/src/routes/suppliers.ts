@@ -10,7 +10,7 @@ import {
   supplierExpertsTable,
 } from "@workspace/db";
 import { eq, ilike, and, sql, desc } from "drizzle-orm";
-import { optionalAuth, requireAuth, requireRole } from "../middlewares/auth";
+import { optionalAuth, requireAuth, requireCanSell } from "../middlewares/auth";
 import { asyncHandler } from "../middlewares/asyncHandler";
 import path from "path";
 import fs from "fs";
@@ -272,7 +272,7 @@ router.get("/suppliers/:id", asyncHandler(async (req, res) => {
   });
 }));
 
-router.post("/suppliers/upload-image", requireAuth, requireRole("supplier", "admin"), upload.single("image"), asyncHandler(async (req: any, res) => {
+router.post("/suppliers/upload-image", requireAuth, requireCanSell, upload.single("image"), asyncHandler(async (req: any, res) => {
   if (!req.file) {
     res.status(400).json({ message: "No file uploaded" });
     return;

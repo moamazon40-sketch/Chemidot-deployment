@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { rfqsTable, usersTable, quotationsTable, suppliersTable, ordersTable, productsTable, categoriesTable, negotiationMessagesTable, notificationsTable } from "@workspace/db";
 import { eq, and, sql, desc, inArray, or, ilike } from "drizzle-orm";
-import { requireAuth, requireRole } from "../middlewares/auth";
+import { canUserBuy, canUserSell, requireAuth, requireCanBuy, requireCanSell } from "../middlewares/auth";
 import { asyncHandler } from "../middlewares/asyncHandler";
 import { CreateRfqBody, UpdateRfqBody, SubmitQuotationBody, SendNegotiationMessageBody } from "@workspace/api-zod";
 import { canSupplierAccessRfqs, getSupplierRfqListLimit, isSupplierSuspended } from "../lib/subscriptions";
@@ -99,16 +99,25 @@ async function notifySupplierUsersForRfq(rfq: typeof rfqsTable.$inferSelect) {
 
 router.get("/rfqs", requireAuth, asyncHandler(async (req, res) => {
   const user = (req as any).user;
-  const { status, page = "1", limit = "20" } = req.query as any;
+  const { status, page = "1", limit = "20", view } = req.query as any;
   const pageNum = Math.max(1, parseInt(page));
   let limitNum = Math.min(50, parseInt(limit));
   let visibleTotalCap: number | null = null;
+  const requestedView = view === "sell" ? "sell" : "buy";
 
   const conditions: any[] = [];
 
-  if (user.role === "buyer") {
+  if (requestedView === "buy") {
+    if (!canUserBuy(user)) {
+      res.status(403).json({ message: "Buying capability is required for this view." });
+      return;
+    }
     conditions.push(eq(rfqsTable.buyerId, user.id));
-  } else if (user.role === "supplier") {
+  } else {
+    if (!canUserSell(user)) {
+      res.status(403).json({ message: "Selling capability is required for this view." });
+      return;
+    }
     const [supplier] = await db.select().from(suppliersTable).where(eq(suppliersTable.userId, user.id)).limit(1);
     if (supplier && !isSupplierSuspended(supplier)) {
       visibleTotalCap = getSupplierRfqListLimit(supplier);
@@ -155,7 +164,6 @@ router.get("/rfqs", requireAuth, asyncHandler(async (req, res) => {
     } else {
       conditions.push(sql`false`);
     }
-
   }
 
   if (status) conditions.push(eq(rfqsTable.status, status));
@@ -199,7 +207,7 @@ router.get("/rfqs", requireAuth, asyncHandler(async (req, res) => {
   });
 }));
 
-router.post("/rfqs", requireAuth, requireRole("buyer", "admin"), asyncHandler(async (req, res) => {
+router.post("/rfqs", requireAuth, requireCanBuy, asyncHandler(async (req, res) => {
   const user = (req as any).user;
   const parsed = CreateRfqBody.safeParse(req.body);
   if (!parsed.success) {
@@ -287,6 +295,10 @@ router.put("/rfqs/:id", requireAuth, asyncHandler(async (req, res) => {
     res.status(404).json({ message: "RFQ not found" });
     return;
   }
+  if (!canUserBuy(user)) {
+    res.status(403).json({ message: "Buying capability is required for this action." });
+    return;
+  }
   if (existing.buyerId !== user.id) {
     res.status(403).json({ message: "Forbidden" });
     return;
@@ -318,6 +330,10 @@ router.delete("/rfqs/:id", requireAuth, asyncHandler(async (req, res) => {
   const [existing] = await db.select().from(rfqsTable).where(eq(rfqsTable.id, id)).limit(1);
   if (!existing) {
     res.status(404).json({ message: "RFQ not found" });
+    return;
+  }
+  if (!canUserBuy(user)) {
+    res.status(403).json({ message: "Buying capability is required for this action." });
     return;
   }
   if (existing.buyerId !== user.id) {
@@ -358,14 +374,22 @@ router.get("/rfqs/:id", requireAuth, asyncHandler(async (req, res) => {
     return;
   }
 
-  if (user.role === "buyer" && row.rfqs.buyerId !== user.id) {
-    res.status(403).json({ message: "Forbidden" });
-    return;
-  }
-
   const quotations = await db.select().from(quotationsTable)
     .leftJoin(suppliersTable, eq(suppliersTable.id, quotationsTable.supplierId))
     .where(eq(quotationsTable.rfqId, id));
+
+  const [supplier] = canUserSell(user)
+    ? await db.select().from(suppliersTable).where(eq(suppliersTable.userId, user.id)).limit(1)
+    : [undefined];
+  const isBuyer = row.rfqs.buyerId === user.id;
+  const isSupplier = !!supplier && (
+    row.rfqs.supplierId === supplier.id ||
+    quotations.some((quotation) => quotation.quotations.supplierId === supplier.id)
+  );
+  if (!isBuyer && !isSupplier && user.role !== "admin") {
+    res.status(403).json({ message: "Forbidden" });
+    return;
+  }
 
   const rfqBase = buildRfq(row.rfqs, quotations.length, row.users?.companyName ?? "");
   res.json({
@@ -399,13 +423,18 @@ router.get("/rfqs/:id/quotations", requireAuth, asyncHandler(async (req, res) =>
     res.status(404).json({ message: "RFQ not found" });
     return;
   }
-  if (user.role === "buyer" && rfqOwner.buyerId !== user.id) {
-    res.status(403).json({ message: "Forbidden" });
-    return;
-  }
   const quotations = await db.select().from(quotationsTable)
     .leftJoin(suppliersTable, eq(suppliersTable.id, quotationsTable.supplierId))
     .where(eq(quotationsTable.rfqId, id));
+  const [supplier] = canUserSell(user)
+    ? await db.select().from(suppliersTable).where(eq(suppliersTable.userId, user.id)).limit(1)
+    : [undefined];
+  const isBuyer = rfqOwner.buyerId === user.id;
+  const isSupplier = !!supplier && quotations.some((quotation) => quotation.quotations.supplierId === supplier.id);
+  if (!isBuyer && !isSupplier && user.role !== "admin") {
+    res.status(403).json({ message: "Forbidden" });
+    return;
+  }
 
   const [rfq] = await db.select().from(rfqsTable).where(eq(rfqsTable.id, id)).limit(1);
 
@@ -426,7 +455,7 @@ router.get("/rfqs/:id/quotations", requireAuth, asyncHandler(async (req, res) =>
   })));
 }));
 
-router.post("/rfqs/:id/quotations", requireAuth, requireRole("supplier", "admin"), asyncHandler(async (req, res) => {
+router.post("/rfqs/:id/quotations", requireAuth, requireCanSell, asyncHandler(async (req, res) => {
   const user = (req as any).user;
   const rfqId = parseInt(String(req.params.id));
   const parsed = SubmitQuotationBody.safeParse(req.body);

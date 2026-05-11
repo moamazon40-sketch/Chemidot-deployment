@@ -48,6 +48,34 @@ export function requireRole(...roles: string[]) {
   };
 }
 
+export function canUserBuy(user: any): boolean {
+  if (!user) return false;
+  return user.role === "admin" || user.canBuy === true;
+}
+
+export function canUserSell(user: any): boolean {
+  if (!user) return false;
+  return user.role === "admin" || user.canSell === true;
+}
+
+export function requireCanBuy(req: Request, res: Response, next: NextFunction) {
+  const user = (req as any).user;
+  if (!canUserBuy(user)) {
+    res.status(403).json({ message: "Buying capability is required for this action." });
+    return;
+  }
+  next();
+}
+
+export function requireCanSell(req: Request, res: Response, next: NextFunction) {
+  const user = (req as any).user;
+  if (!canUserSell(user)) {
+    res.status(403).json({ message: "Selling capability is required for this action." });
+    return;
+  }
+  next();
+}
+
 export function optionalAuth(req: Request, _res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith("Bearer ")) {

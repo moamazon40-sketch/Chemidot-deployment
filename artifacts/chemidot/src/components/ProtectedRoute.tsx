@@ -2,16 +2,19 @@ import { useEffect } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { Skeleton } from "@/components/ui/skeleton";
+import { userCanBuy, userCanSell } from "@/lib/account-capabilities";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
   requiredRole?: "buyer" | "supplier" | "admin";
+  requiredCapability?: "buy" | "sell";
   redirectTo?: string;
 }
 
 export function ProtectedRoute({
   children,
   requiredRole,
+  requiredCapability,
   redirectTo = "/auth/login",
 }: ProtectedRouteProps) {
   const { user, isLoading } = useAuth();
@@ -25,8 +28,16 @@ export function ProtectedRoute({
     }
     if (requiredRole && user.role !== requiredRole && user.role !== "admin") {
       navigate("/dashboard");
+      return;
     }
-  }, [user, isLoading, requiredRole, redirectTo, navigate]);
+    if (requiredCapability === "buy" && !userCanBuy(user)) {
+      navigate("/dashboard");
+      return;
+    }
+    if (requiredCapability === "sell" && !userCanSell(user)) {
+      navigate("/dashboard");
+    }
+  }, [user, isLoading, requiredRole, requiredCapability, redirectTo, navigate]);
 
   if (isLoading) {
     return (
@@ -45,6 +56,8 @@ export function ProtectedRoute({
 
   if (!user) return null;
   if (requiredRole && user.role !== requiredRole && user.role !== "admin") return null;
+  if (requiredCapability === "buy" && !userCanBuy(user)) return null;
+  if (requiredCapability === "sell" && !userCanSell(user)) return null;
 
   return <>{children}</>;
 }

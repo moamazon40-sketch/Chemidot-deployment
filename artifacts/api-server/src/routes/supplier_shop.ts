@@ -8,7 +8,7 @@ import {
 } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { asyncHandler } from "../middlewares/asyncHandler";
-import { requireAuth, requireRole } from "../middlewares/auth";
+import { requireAuth, requireCanSell } from "../middlewares/auth";
 import { insertSupplierBrandSchema, insertSupplierDocumentSchema, insertSupplierExpertSchema } from "@workspace/db";
 
 const router = Router();
@@ -77,7 +77,7 @@ router.get("/suppliers/:id/experts", asyncHandler(async (req, res) => {
   })));
 }));
 
-router.post("/suppliers/profile/brands", requireAuth, requireRole("supplier"), asyncHandler(async (req: any, res) => {
+router.post("/suppliers/profile/brands", requireAuth, requireCanSell, asyncHandler(async (req: any, res) => {
   const supplierId = await getCurrentSupplierId(req.user.id);
   if (!supplierId) {
     res.status(404).json({ message: "Supplier profile not found" });
@@ -94,7 +94,7 @@ router.post("/suppliers/profile/brands", requireAuth, requireRole("supplier"), a
   res.status(201).json(brand);
 }));
 
-router.patch("/suppliers/profile/brands/:id", requireAuth, requireRole("supplier"), asyncHandler(async (req: any, res) => {
+router.patch("/suppliers/profile/brands/:id", requireAuth, requireCanSell, asyncHandler(async (req: any, res) => {
   const supplierId = await getCurrentSupplierId(req.user.id);
   const brandId = parseInt(String(req.params.id), 10);
   if (!supplierId) {
@@ -116,7 +116,7 @@ router.patch("/suppliers/profile/brands/:id", requireAuth, requireRole("supplier
   res.json(updated);
 }));
 
-router.delete("/suppliers/profile/brands/:id", requireAuth, requireRole("supplier"), asyncHandler(async (req: any, res) => {
+router.delete("/suppliers/profile/brands/:id", requireAuth, requireCanSell, asyncHandler(async (req: any, res) => {
   const supplierId = await getCurrentSupplierId(req.user.id);
   const brandId = parseInt(String(req.params.id), 10);
   if (!supplierId) {
@@ -134,7 +134,7 @@ router.delete("/suppliers/profile/brands/:id", requireAuth, requireRole("supplie
   res.json({ message: "Brand deleted" });
 }));
 
-router.post("/suppliers/profile/documents", requireAuth, requireRole("supplier"), asyncHandler(async (req: any, res) => {
+router.post("/suppliers/profile/documents", requireAuth, requireCanSell, asyncHandler(async (req: any, res) => {
   const supplierId = await getCurrentSupplierId(req.user.id);
   if (!supplierId) {
     res.status(404).json({ message: "Supplier profile not found" });
@@ -151,7 +151,7 @@ router.post("/suppliers/profile/documents", requireAuth, requireRole("supplier")
   res.status(201).json(document);
 }));
 
-router.patch("/suppliers/profile/documents/:id", requireAuth, requireRole("supplier"), asyncHandler(async (req: any, res) => {
+router.patch("/suppliers/profile/documents/:id", requireAuth, requireCanSell, asyncHandler(async (req: any, res) => {
   const supplierId = await getCurrentSupplierId(req.user.id);
   const documentId = parseInt(String(req.params.id), 10);
   if (!supplierId) {
@@ -173,7 +173,7 @@ router.patch("/suppliers/profile/documents/:id", requireAuth, requireRole("suppl
   res.json(updated);
 }));
 
-router.delete("/suppliers/profile/documents/:id", requireAuth, requireRole("supplier"), asyncHandler(async (req: any, res) => {
+router.delete("/suppliers/profile/documents/:id", requireAuth, requireCanSell, asyncHandler(async (req: any, res) => {
   const supplierId = await getCurrentSupplierId(req.user.id);
   const documentId = parseInt(String(req.params.id), 10);
   if (!supplierId) {
@@ -191,7 +191,7 @@ router.delete("/suppliers/profile/documents/:id", requireAuth, requireRole("supp
   res.json({ message: "Document deleted" });
 }));
 
-router.post("/suppliers/profile/experts", requireAuth, requireRole("supplier"), asyncHandler(async (req: any, res) => {
+router.post("/suppliers/profile/experts", requireAuth, requireCanSell, asyncHandler(async (req: any, res) => {
   const supplierId = await getCurrentSupplierId(req.user.id);
   if (!supplierId) {
     res.status(404).json({ message: "Supplier profile not found" });
@@ -208,7 +208,7 @@ router.post("/suppliers/profile/experts", requireAuth, requireRole("supplier"), 
   res.status(201).json(expert);
 }));
 
-router.patch("/suppliers/profile/experts/:id", requireAuth, requireRole("supplier"), asyncHandler(async (req: any, res) => {
+router.patch("/suppliers/profile/experts/:id", requireAuth, requireCanSell, asyncHandler(async (req: any, res) => {
   const supplierId = await getCurrentSupplierId(req.user.id);
   const expertId = parseInt(String(req.params.id), 10);
   if (!supplierId) {
@@ -230,7 +230,7 @@ router.patch("/suppliers/profile/experts/:id", requireAuth, requireRole("supplie
   res.json(updated);
 }));
 
-router.delete("/suppliers/profile/experts/:id", requireAuth, requireRole("supplier"), asyncHandler(async (req: any, res) => {
+router.delete("/suppliers/profile/experts/:id", requireAuth, requireCanSell, asyncHandler(async (req: any, res) => {
   const supplierId = await getCurrentSupplierId(req.user.id);
   const expertId = parseInt(String(req.params.id), 10);
   if (!supplierId) {

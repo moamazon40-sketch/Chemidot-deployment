@@ -20,7 +20,8 @@ export const HealthCheckResponse = zod.object({
 export const RegisterBody = zod.object({
   email: zod.string(),
   password: zod.string(),
-  role: zod.enum(["buyer", "supplier"]),
+  role: zod.enum(["buyer", "supplier"]).optional(),
+  accountMode: zod.enum(["buyer", "supplier", "both"]).optional(),
   firstName: zod.string(),
   lastName: zod.string(),
   companyName: zod.string(),
@@ -45,6 +46,8 @@ export const LoginResponse = zod.object({
     id: zod.number(),
     email: zod.string(),
     role: zod.enum(["buyer", "supplier", "admin"]),
+    canBuy: zod.boolean(),
+    canSell: zod.boolean(),
     firstName: zod.string(),
     lastName: zod.string(),
     companyName: zod.string(),
@@ -63,6 +66,8 @@ export const GetMeResponse = zod.object({
   id: zod.number(),
   email: zod.string(),
   role: zod.enum(["buyer", "supplier", "admin"]),
+  canBuy: zod.boolean(),
+  canSell: zod.boolean(),
   firstName: zod.string(),
   lastName: zod.string(),
   companyName: zod.string(),
@@ -672,6 +677,7 @@ export const listRfqsQueryLimitDefault = 20;
 
 export const ListRfqsQueryParams = zod.object({
   status: zod.enum(["pending", "active", "closed", "awarded"]).optional(),
+  view: zod.enum(["buy", "sell"]).optional(),
   page: zod.coerce.number().default(listRfqsQueryPageDefault),
   limit: zod.coerce.number().default(listRfqsQueryLimitDefault),
 });
@@ -1105,6 +1111,7 @@ export const ListOrdersQueryParams = zod.object({
       "cancelled",
     ])
     .optional(),
+  view: zod.enum(["buy", "sell"]).optional(),
   page: zod.coerce.number().default(listOrdersQueryPageDefault),
   limit: zod.coerce.number().default(listOrdersQueryLimitDefault),
 });
@@ -1577,6 +1584,8 @@ export const AdminListUsersResponse = zod.object({
       id: zod.number(),
       email: zod.string(),
       role: zod.enum(["buyer", "supplier", "admin"]),
+      canBuy: zod.boolean(),
+      canSell: zod.boolean(),
       firstName: zod.string(),
       lastName: zod.string(),
       companyName: zod.string(),

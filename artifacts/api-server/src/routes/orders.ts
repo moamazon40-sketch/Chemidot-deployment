@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { notificationsTable, ordersTable, productsTable, suppliersTable, usersTable } from "@workspace/db";
 import { eq, and, or, sql, desc } from "drizzle-orm";
-import { requireAuth } from "../middlewares/auth";
+import { canUserBuy, canUserSell, requireAuth } from "../middlewares/auth";
 import { asyncHandler } from "../middlewares/asyncHandler";
 import { UpdateOrderStatusBody } from "@workspace/api-zod";
 import { z } from "zod/v4";
@@ -105,24 +105,33 @@ const STATUS_WORKFLOW = {
 
 router.get("/orders", requireAuth, asyncHandler(async (req, res) => {
   const user = (req as any).user;
-  const { status, page = "1", limit = "20" } = req.query as any;
+  const { status, page = "1", limit = "20", view } = req.query as any;
   const pageNum = Math.max(1, parseInt(page));
   const limitNum = Math.min(50, parseInt(limit));
   const offset = (pageNum - 1) * limitNum;
 
   const conditions: any[] = [];
+  const requestedView = view === "sell" ? "sell" : "buy";
 
-  if (user.role === "buyer") {
+  if (user.role === "admin") {
+    // admin sees all
+  } else if (requestedView === "buy") {
+    if (!canUserBuy(user)) {
+      res.status(403).json({ message: "Buying capability is required for this view." });
+      return;
+    }
     conditions.push(eq(ordersTable.buyerId, user.id));
-  } else if (user.role === "supplier") {
+  } else {
+    if (!canUserSell(user)) {
+      res.status(403).json({ message: "Selling capability is required for this view." });
+      return;
+    }
     const [supplier] = await db.select().from(suppliersTable).where(eq(suppliersTable.userId, user.id)).limit(1);
     if (supplier) {
       conditions.push(eq(ordersTable.supplierId, supplier.id));
     } else {
       conditions.push(sql`false`);
     }
-  } else if (user.role === "admin") {
-    // admin sees all
   }
 
   if (status) conditions.push(eq(ordersTable.status, status));
@@ -151,6 +160,10 @@ router.get("/orders", requireAuth, asyncHandler(async (req, res) => {
 
 router.post("/orders", requireAuth, asyncHandler(async (req, res) => {
   const user = (req as any).user;
+  if (!canUserBuy(user)) {
+    res.status(403).json({ message: "Buying capability is required for this action." });
+    return;
+  }
   const { supplierId, productId, productName, quantity, unit, totalPrice, currency, deliveryAddress } = req.body;
 
   if (!supplierId || !quantity || !totalPrice) {

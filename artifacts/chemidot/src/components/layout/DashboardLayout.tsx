@@ -1,8 +1,9 @@
-import { Link, useLocation } from "wouter";
+import { Link, useLocation, useSearch } from "wouter";
 import { useAuth } from "@/lib/auth";
+import { getPreferredDashboardMode, userCanBuy, userCanSell, withDashboardMode, type DashboardMode } from "@/lib/account-capabilities";
 import {
   LayoutDashboard, Package, FileText, Users, Settings, LogOut,
-  MessageSquare, Store, ShoppingCart, User, ChevronDown, Menu
+  MessageSquare, Store, ShoppingCart, User, ArrowLeftRight
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -50,8 +51,11 @@ type NavGroup = {
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function buildNavGroups(role: string, t: Record<string, any>, unreadCount: number, rfqUnreadCount: number, orderUnreadCount: number): NavGroup[] {
-  if (role === "admin") {
+function buildNavGroups(user: any, mode: DashboardMode, t: Record<string, any>, unreadCount: number, rfqUnreadCount: number, orderUnreadCount: number): NavGroup[] {
+  const sellPath = (path: string) => withDashboardMode(path, "sell");
+  const buyPath = (path: string) => withDashboardMode(path, "buy");
+
+  if (user.role === "admin") {
     return [
       {
         title: "Management",
@@ -70,44 +74,44 @@ function buildNavGroups(role: string, t: Record<string, any>, unreadCount: numbe
     ];
   }
 
-  if (role === "buyer") {
+  if (mode === "buy") {
     return [
       {
         title: "Sourcing",
         items: [
-          { href: "/dashboard", label: t.overview, icon: LayoutDashboard },
+          { href: buyPath("/dashboard"), label: t.overview, icon: LayoutDashboard },
           { href: "/marketplace", label: t.marketplace, icon: Store },
-          { href: "/dashboard/rfqs", label: t.rfqsQuotes, icon: FileText, badge: rfqUnreadCount },
-          { href: "/dashboard/orders", label: t.orders, icon: Package, badge: orderUnreadCount },
-          { href: "/dashboard/collective", label: t.collectiveOrdersSidebar, icon: Users },
+          { href: buyPath("/dashboard/rfqs"), label: t.rfqsQuotes, icon: FileText, badge: rfqUnreadCount },
+          { href: buyPath("/dashboard/orders"), label: t.orders, icon: Package, badge: orderUnreadCount },
+          { href: buyPath("/dashboard/collective"), label: t.collectiveOrdersSidebar, icon: Users },
         ],
       },
       {
         title: "Account",
         items: [
-          { href: "/dashboard/messages", label: t.messages, icon: MessageSquare, badge: unreadCount },
-          { href: "/dashboard/settings", label: t.profileSettings, icon: User },
+          { href: buyPath("/dashboard/messages"), label: t.messages, icon: MessageSquare, badge: unreadCount },
+          { href: buyPath("/dashboard/settings"), label: t.profileSettings, icon: User },
         ],
       },
     ];
   }
 
-  if (role === "supplier") {
+  if (mode === "sell") {
     return [
       {
         title: "Sales",
         items: [
-          { href: "/dashboard", label: t.overview, icon: LayoutDashboard },
-          { href: "/dashboard/products", label: t.myProducts, icon: Store },
-          { href: "/dashboard/rfqs", label: t.rfqsQuotes, icon: FileText, badge: rfqUnreadCount },
-          { href: "/dashboard/orders", label: t.orders, icon: ShoppingCart, badge: orderUnreadCount },
+          { href: sellPath("/dashboard"), label: t.overview, icon: LayoutDashboard },
+          { href: sellPath("/dashboard/products"), label: t.myProducts, icon: Store },
+          { href: sellPath("/dashboard/rfqs"), label: t.rfqsQuotes, icon: FileText, badge: rfqUnreadCount },
+          { href: sellPath("/dashboard/orders"), label: t.orders, icon: ShoppingCart, badge: orderUnreadCount },
         ],
       },
       {
         title: "Account",
         items: [
-          { href: "/dashboard/messages", label: t.messages, icon: MessageSquare, badge: unreadCount },
-          { href: "/dashboard/settings", label: t.profileSettings, icon: User },
+          { href: sellPath("/dashboard/messages"), label: t.messages, icon: MessageSquare, badge: unreadCount },
+          { href: sellPath("/dashboard/settings"), label: t.profileSettings, icon: User },
         ],
       },
     ];
@@ -116,11 +120,13 @@ function buildNavGroups(role: string, t: Record<string, any>, unreadCount: numbe
   return [];
 }
 
-function AppSidebar({ groups }: { groups: NavGroup[] }) {
+function AppSidebar({ groups, mode }: { groups: NavGroup[]; mode: DashboardMode }) {
   const { state } = useSidebar();
   const [location] = useLocation();
+  const search = useSearch();
   const { logout, user } = useAuth();
   const isCollapsed = state === "collapsed";
+  const dualMode = userCanBuy(user) && userCanSell(user) && user?.role !== "admin";
 
   return (
     <Sidebar collapsible="icon">
@@ -136,7 +142,31 @@ function AppSidebar({ groups }: { groups: NavGroup[] }) {
         {!isCollapsed && user && (
           <div className="px-2 pb-2 pt-1">
             <p className="text-xs font-medium truncate text-sidebar-foreground">{user.companyName}</p>
-            <p className="text-[11px] text-sidebar-foreground/50 capitalize">{user.role}</p>
+            <p className="text-[11px] text-sidebar-foreground/50 capitalize">
+              {dualMode ? `${mode === "buy" ? "Buying" : "Selling"} view` : user.role}
+            </p>
+            {dualMode && (
+              <div className="mt-2 grid grid-cols-2 gap-1 rounded-lg border border-sidebar-border/60 bg-sidebar-accent/40 p-1">
+                <Link
+                  href={withDashboardMode(location + search, "buy")}
+                  className={cn(
+                    "rounded-md px-2 py-1 text-center text-[11px] font-medium",
+                    mode === "buy" ? "bg-background text-foreground shadow-sm" : "text-sidebar-foreground/70"
+                  )}
+                >
+                  Buying
+                </Link>
+                <Link
+                  href={withDashboardMode(location + search, "sell")}
+                  className={cn(
+                    "rounded-md px-2 py-1 text-center text-[11px] font-medium",
+                    mode === "sell" ? "bg-background text-foreground shadow-sm" : "text-sidebar-foreground/70"
+                  )}
+                >
+                  Selling
+                </Link>
+              </div>
+            )}
           </div>
         )}
       </SidebarHeader>
@@ -192,16 +222,20 @@ function AppSidebar({ groups }: { groups: NavGroup[] }) {
 
 function TopNav() {
   const { user, logout } = useAuth();
-  const { toggleSidebar } = useSidebar();
+  const search = useSearch();
+  const [location] = useLocation();
 
   const initials = user
     ? `${user.firstName?.[0] ?? ""}${user.lastName?.[0] ?? ""}`.toUpperCase() || "U"
     : "U";
 
-  const roleLabel =
-    user?.role === "admin" ? "Admin" :
-    user?.role === "buyer" ? "Buyer" :
-    user?.role === "supplier" ? "Supplier" : "";
+  const mode = getPreferredDashboardMode(user, search);
+  const dualMode = userCanBuy(user) && userCanSell(user) && user?.role !== "admin";
+  const roleLabel = user?.role === "admin"
+    ? "Admin"
+    : dualMode
+      ? mode === "buy" ? "Buying" : "Selling"
+      : userCanSell(user) ? "Supplier" : "Buyer";
 
   return (
     <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b bg-background px-4 shrink-0">
@@ -214,6 +248,14 @@ function TopNav() {
       </div>
 
       <div className="flex items-center gap-2">
+        {dualMode && (
+          <Button variant="outline" size="sm" asChild className="hidden sm:inline-flex gap-1.5">
+            <Link href={withDashboardMode(location + search, mode === "buy" ? "sell" : "buy")}>
+              <ArrowLeftRight className="h-3.5 w-3.5" />
+              {mode === "buy" ? "Switch to Selling" : "Switch to Buying"}
+            </Link>
+          </Button>
+        )}
         {roleLabel && (
           <Badge variant="outline" className="hidden sm:flex capitalize text-xs">
             {roleLabel}
@@ -262,7 +304,9 @@ function TopNav() {
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
+  const search = useSearch();
   const { t } = useLanguage();
+  const mode = getPreferredDashboardMode(user, search);
   const { data: notifs } = useListNotifications(
     { unreadOnly: true },
     { query: { enabled: !!user } as any }
@@ -302,11 +346,11 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     );
   }
 
-  const groups = buildNavGroups(user.role, t, unreadCount, rfqUnreadCount, orderUnreadCount);
+  const groups = buildNavGroups(user, mode, t, unreadCount, rfqUnreadCount, orderUnreadCount);
 
   return (
     <SidebarProvider defaultOpen={true}>
-      <AppSidebar groups={groups} />
+      <AppSidebar groups={groups} mode={mode} />
       <SidebarInset className="flex flex-col min-h-screen min-w-0">
         <TopNav />
         <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-auto">

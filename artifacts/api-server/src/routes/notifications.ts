@@ -7,23 +7,58 @@ import { asyncHandler } from "../middlewares/asyncHandler";
 
 const router = Router();
 
-function notificationTargetUrl(n: typeof notificationsTable.$inferSelect, role: string) {
-  if (n.relatedType === "rfq" && n.relatedId) {
-    return role === "admin" ? "/admin?tab=rfqs" : `/dashboard/rfqs/${n.relatedId}`;
-  }
-  if (n.relatedType === "order" && n.relatedId) {
-    return role === "admin" ? "/admin?tab=orders" : `/dashboard/orders?orderId=${n.relatedId}`;
-  }
-  if (n.relatedType === "collective_order" && n.relatedId) {
-    return role === "admin" ? "/admin?tab=collective" : "/dashboard/collective";
-  }
-  if (n.relatedType === "message") {
-    return "/dashboard/messages";
-  }
-  return role === "admin" ? "/admin" : "/dashboard";
+function userModeForNotification(
+  user: { role: string; canBuy?: boolean | null; canSell?: boolean | null },
+  relatedType: string | null,
+) {
+  if (user.role === "admin") return null;
+  const canBuy = user.canBuy === true;
+  const canSell = user.canSell === true;
+  if (!canBuy || !canSell) return canSell ? "sell" : "buy";
+  if (relatedType === "order" || relatedType === "rfq") return "sell";
+  return "buy";
 }
 
-function serializeNotification(n: typeof notificationsTable.$inferSelect, role: string) {
+function appendMode(url: string, mode: "buy" | "sell" | null) {
+  if (!mode || !url.startsWith("/dashboard")) return url;
+  const [pathname, hash = ""] = url.split("#");
+  const [basePath, queryString = ""] = pathname.split("?");
+  const params = new URLSearchParams(queryString);
+  params.set("mode", mode);
+  const next = `${basePath}?${params.toString()}`;
+  return hash ? `${next}#${hash}` : next;
+}
+
+function notificationTargetUrl(
+  n: typeof notificationsTable.$inferSelect,
+  user: { role: string; canBuy?: boolean | null; canSell?: boolean | null },
+) {
+  const mode = userModeForNotification(user, n.relatedType ?? null);
+  if (n.relatedType === "rfq" && n.relatedId) {
+    return user.role === "admin"
+      ? "/admin?tab=rfqs"
+      : appendMode(`/dashboard/rfqs/${n.relatedId}`, mode);
+  }
+  if (n.relatedType === "order" && n.relatedId) {
+    return user.role === "admin"
+      ? "/admin?tab=orders"
+      : appendMode(`/dashboard/orders?orderId=${n.relatedId}`, mode);
+  }
+  if (n.relatedType === "collective_order" && n.relatedId) {
+    return user.role === "admin"
+      ? "/admin?tab=collective"
+      : appendMode("/dashboard/collective", mode ?? "buy");
+  }
+  if (n.relatedType === "message") {
+    return appendMode("/dashboard/messages", mode);
+  }
+  return user.role === "admin" ? "/admin" : appendMode("/dashboard", mode);
+}
+
+function serializeNotification(
+  n: typeof notificationsTable.$inferSelect,
+  user: { role: string; canBuy?: boolean | null; canSell?: boolean | null },
+) {
   return {
     id: n.id,
     userId: n.userId,
@@ -33,7 +68,7 @@ function serializeNotification(n: typeof notificationsTable.$inferSelect, role: 
     isRead: n.isRead,
     relatedId: n.relatedId,
     relatedType: n.relatedType,
-    targetUrl: notificationTargetUrl(n, role),
+    targetUrl: notificationTargetUrl(n, user),
     createdAt: n.createdAt instanceof Date ? n.createdAt.toISOString() : n.createdAt,
   };
 }
@@ -50,7 +85,7 @@ router.get("/notifications", requireAuth, asyncHandler(async (req, res) => {
     .orderBy(desc(notificationsTable.createdAt))
     .limit(50);
 
-  res.json(notifications.map(n => serializeNotification(n, user.role)));
+  res.json(notifications.map(n => serializeNotification(n, user)));
 }));
 
 router.post("/notifications/read-all", requireAuth, asyncHandler(async (req, res) => {
@@ -98,7 +133,7 @@ router.post("/notifications/:id/read", requireAuth, asyncHandler(async (req, res
     return;
   }
 
-  res.json(serializeNotification(notification, user.role));
+  res.json(serializeNotification(notification, user));
 }));
 
 export default router;

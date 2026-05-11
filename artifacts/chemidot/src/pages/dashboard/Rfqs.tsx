@@ -1,5 +1,6 @@
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { getStoredToken, useAuth } from "@/lib/auth";
+import { getPreferredDashboardMode, userCanBuy } from "@/lib/account-capabilities";
 import { useListRfqs, useCreateRfq, useUpdateRfq, useDeleteRfq, useListCategories, getListRfqsQueryKey } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -332,6 +333,8 @@ export default function Rfqs() {
 
   // Read pre-fill params from ProductDetail navigation
   const params = new URLSearchParams(search);
+  const mode = getPreferredDashboardMode(user, search);
+  const isBuyingView = mode === "buy";
   const prefillProduct = params.get("product") || "";
   const prefillQty = params.get("qty") || "";
 
@@ -351,6 +354,7 @@ export default function Rfqs() {
 
   const { data, isLoading, refetch } = useListRfqs({
     status: statusFilter === "all" ? undefined : (statusFilter as any),
+    view: isBuyingView ? "buy" : "sell",
   });
 
   const filtered = data?.rfqs ?? [];
@@ -368,12 +372,12 @@ export default function Rfqs() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Requests for Quotation</h1>
             <p className="text-muted-foreground">
-              {user?.role === "buyer"
+              {isBuyingView
                 ? "Track your sourcing requests and compare supplier quotes."
                 : "Review incoming RFQs and submit competitive quotes."}
             </p>
           </div>
-          {user?.role === "buyer" && (
+          {isBuyingView && userCanBuy(user) && (
             <CreateRfqDialog
               onCreated={() => refetch()}
               defaultProduct={prefillProduct}
@@ -437,11 +441,11 @@ export default function Rfqs() {
                 <FileText className="w-12 h-12 text-muted-foreground/30 mb-4" />
                 <h3 className="text-lg font-medium">No RFQs found</h3>
                 <p className="text-muted-foreground mt-1 mb-4 text-sm">
-                  {user?.role === "buyer"
+                  {isBuyingView
                     ? "You haven't created any requests yet."
                     : "No RFQs available to quote on right now."}
                 </p>
-                {user?.role === "buyer" && (
+                {isBuyingView && userCanBuy(user) && (
                   <CreateRfqDialog onCreated={() => refetch()} defaultProduct={prefillProduct} defaultQty={prefillQty} />
                 )}
               </div>
@@ -451,8 +455,8 @@ export default function Rfqs() {
                   const meta = STATUS_META[rfq.status] ?? STATUS_META.active;
                   const StatusIcon = meta.icon;
                   const quoteProgress = Math.min(100, (rfq.quotationCount / 5) * 100);
-                  const canEdit = user?.role === "buyer" && rfq.status !== "awarded" && rfq.status !== "closed";
-                  const canDelete = user?.role === "buyer" && rfq.status !== "awarded";
+                  const canEdit = isBuyingView && rfq.status !== "awarded" && rfq.status !== "closed";
+                  const canDelete = isBuyingView && rfq.status !== "awarded";
                   return (
                     <div key={rfq.id} className="p-5 hover:bg-muted/30 transition-colors group">
                       <div className="flex flex-col sm:flex-row sm:items-center gap-4">
@@ -479,7 +483,7 @@ export default function Rfqs() {
                               <span className="flex items-center gap-1">
                                 <Clock className="w-3 h-3" /> Due {new Date(rfq.deliveryDeadline).toLocaleDateString()}
                               </span>
-                              {rfq.buyerCompanyName && user?.role !== "buyer" && (
+                              {rfq.buyerCompanyName && !isBuyingView && (
                                 <span>{rfq.buyerCompanyName}</span>
                               )}
                             </div>

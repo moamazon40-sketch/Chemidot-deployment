@@ -54,3 +54,7 @@ Thumbs.db
 .env.*.local
 
 .vercel
+
+# Local Codex/Corepack helper files
+.corepack/
+.gitconfig

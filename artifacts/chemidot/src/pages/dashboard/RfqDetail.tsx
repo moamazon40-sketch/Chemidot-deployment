@@ -28,6 +28,7 @@ import {
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { getStoredToken, useAuth } from "@/lib/auth";
+import { getPreferredDashboardMode, userCanBuy, userCanSell, withDashboardMode } from "@/lib/account-capabilities";
 import { useEffect, useState } from "react";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -310,6 +311,8 @@ export default function RfqDetail() {
   const [, params] = useRoute("/dashboard/rfqs/:id");
   const id = Number(params?.id);
   const { user } = useAuth();
+  const mode = getPreferredDashboardMode(user, window.location.search);
+  const isBuyingView = mode === "buy";
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const qc = useQueryClient();
@@ -342,7 +345,7 @@ export default function RfqDetail() {
       });
       if (!res.ok) throw new Error("Failed");
       toast({ title: "Quotation accepted!", description: `Order created with ${supplierName}` });
-      navigate("/dashboard/orders");
+      navigate(withDashboardMode("/dashboard/orders", "buy"));
     } catch {
       toast({ title: "Error", description: "Could not accept quotation", variant: "destructive" });
     }
@@ -383,7 +386,7 @@ export default function RfqDetail() {
         <div className="p-12 text-center">
           <FileText className="w-12 h-12 mx-auto text-muted-foreground/30 mb-4" />
           <h2 className="text-xl font-semibold">RFQ not found</h2>
-          <Link href="/dashboard/rfqs">
+          <Link href={withDashboardMode("/dashboard/rfqs", mode)}>
             <Button className="mt-4" variant="outline">Back to RFQs</Button>
           </Link>
         </div>
@@ -417,7 +420,7 @@ export default function RfqDetail() {
     <DashboardLayout>
       <div className="space-y-6 max-w-4xl">
         <div className="flex items-start gap-3">
-          <Link href="/dashboard/rfqs">
+          <Link href={withDashboardMode("/dashboard/rfqs", mode)}>
             <Button variant="ghost" size="icon" className="rounded-full mt-0.5">
               <ArrowLeft className="w-4 h-4" />
             </Button>
@@ -434,7 +437,7 @@ export default function RfqDetail() {
               {rfq.buyerCompanyName && ` · ${rfq.buyerCompanyName}`}
             </p>
           </div>
-          {user?.role === "supplier" && rfq.status === "active" && (
+          {userCanSell(user) && !isBuyingView && rfq.status === "active" && (
             <SubmitQuoteDialog
               rfqId={id}
               rfqQuantity={rfq.quantity}
@@ -483,7 +486,7 @@ export default function RfqDetail() {
           </CardContent>
         </Card>
 
-        {bestQuote && user?.role === "buyer" && (
+        {bestQuote && userCanBuy(user) && isBuyingView && (
           <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900 rounded-xl p-4 flex items-center gap-4">
             <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center shrink-0">
               <Star className="w-5 h-5 text-green-600 dark:text-green-400" />
@@ -506,7 +509,7 @@ export default function RfqDetail() {
           </div>
         )}
 
-        {user?.role === "buyer" && pendingQuotes.length >= 2 && (
+        {userCanBuy(user) && isBuyingView && pendingQuotes.length >= 2 && (
           <Card>
             <CardHeader className="pb-3 border-b">
               <CardTitle className="text-base flex items-center gap-2">
@@ -596,11 +599,11 @@ export default function RfqDetail() {
                 <Clock className="w-10 h-10 mx-auto mb-3 opacity-30" />
                 <p className="font-medium">No quotations received yet</p>
                 <p className="text-sm mt-1">
-                  {user?.role === "buyer"
+                  {isBuyingView
                     ? "Suppliers will respond to your request shortly."
                     : "Be the first to submit a competitive quote."}
                 </p>
-                {user?.role === "supplier" && rfq.status === "active" && (
+                {userCanSell(user) && !isBuyingView && rfq.status === "active" && (
                   <div className="mt-4">
                     <SubmitQuoteDialog
                       rfqId={id}
@@ -669,7 +672,7 @@ export default function RfqDetail() {
                             {q.status === "rejected" && <XCircle className="w-3 h-3 mr-1" />}
                             {q.status.charAt(0).toUpperCase() + q.status.slice(1)}
                           </Badge>
-                          {user?.role === "buyer" && rfq.status === "active" && q.status === "pending" && (
+                          {userCanBuy(user) && isBuyingView && rfq.status === "active" && q.status === "pending" && (
                             <>
                               <Button
                                 size="sm"

@@ -1,16 +1,18 @@
 import { useEffect } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
+import { userCanBuy, userCanSell } from "@/lib/account-capabilities";
 
 type Options = {
   requiredRole?: "buyer" | "supplier" | "admin";
+  requiredCapability?: "buy" | "sell";
   redirectTo?: string;
 };
 
 export function useProtectedRoute(options: Options = {}) {
   const { user, isLoading } = useAuth();
   const [, navigate] = useLocation();
-  const { requiredRole, redirectTo = "/auth/login" } = options;
+  const { requiredRole, requiredCapability, redirectTo = "/auth/login" } = options;
 
   useEffect(() => {
     if (isLoading) return;
@@ -20,8 +22,16 @@ export function useProtectedRoute(options: Options = {}) {
     }
     if (requiredRole && user.role !== requiredRole && user.role !== "admin") {
       navigate("/dashboard");
+      return;
     }
-  }, [user, isLoading, requiredRole, redirectTo, navigate]);
+    if (requiredCapability === "buy" && !userCanBuy(user)) {
+      navigate("/dashboard");
+      return;
+    }
+    if (requiredCapability === "sell" && !userCanSell(user)) {
+      navigate("/dashboard");
+    }
+  }, [user, isLoading, requiredRole, requiredCapability, redirectTo, navigate]);
 
   return { user, isLoading };
 }

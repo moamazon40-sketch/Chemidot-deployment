@@ -1,5 +1,6 @@
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useAuth } from "@/lib/auth";
+import { getPreferredDashboardMode, userCanSell } from "@/lib/account-capabilities";
 import { useCreateCollectiveOrder, useListCollectiveOrders, useListCategories } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -133,7 +134,8 @@ function CreateCollectiveOrderDialog({ onCreated }: { onCreated: () => void }) {
 
 export default function DashboardCollective() {
   const { user } = useAuth();
-  const isSupplier = user?.role === "supplier";
+  const mode = getPreferredDashboardMode(user, window.location.search);
+  const isSupplier = mode === "sell" && userCanSell(user);
 
   const { data, isLoading, refetch } = useListCollectiveOrders({ limit: 20 });
   const myOrders = (data?.collectiveOrders ?? []).filter((o: any) =>

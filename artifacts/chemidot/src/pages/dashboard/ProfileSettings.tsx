@@ -1,5 +1,6 @@
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useAuth, getStoredToken } from "@/lib/auth";
+import { userCanBuy, userCanSell } from "@/lib/account-capabilities";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -173,7 +174,14 @@ export default function ProfileSettings() {
     });
   }, [user?.firstName, user?.lastName, user?.companyName, user?.phone, user?.country]);
 
-  const isSupplier = user?.role === "supplier";
+  const isSupplier = userCanSell(user);
+  const accountLabel = userCanBuy(user) && userCanSell(user)
+    ? "buyer + supplier"
+    : userCanSell(user)
+      ? "supplier"
+      : userCanBuy(user)
+        ? "buyer"
+        : user?.role;
 
   const syncSupplierForm = (data: SupplierProfileData) => {
     setSupplierProfile(data);
@@ -416,7 +424,7 @@ export default function ProfileSettings() {
                 <User className="w-4 h-4" /> Account Information
               </CardTitle>
               <div className="flex items-center gap-2">
-                <Badge variant="outline" className="capitalize">{user?.role}</Badge>
+                <Badge variant="outline" className="capitalize">{accountLabel}</Badge>
                 <Badge className="bg-green-100 text-green-800 border-none dark:bg-green-900/30 dark:text-green-400">
                   {user?.status === "active" ? "Active" : user?.status}
                 </Badge>

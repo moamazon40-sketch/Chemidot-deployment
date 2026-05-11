@@ -1,4 +1,4 @@
-import { pgTable, serial, text, timestamp, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, timestamp, pgEnum, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -10,6 +10,8 @@ export const usersTable = pgTable("users", {
   email: text("email").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
   role: userRoleEnum("role").notNull().default("buyer"),
+  canBuy: boolean("can_buy").notNull().default(true),
+  canSell: boolean("can_sell").notNull().default(false),
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
   companyName: text("company_name").notNull(),

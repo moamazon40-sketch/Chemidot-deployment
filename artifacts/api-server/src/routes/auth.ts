@@ -10,6 +10,18 @@ import { getPlanDefaults, getTrialEndDate } from "../lib/subscriptions";
 
 const router = Router();
 
+function resolveCapabilities(accountMode: "buyer" | "supplier" | "both") {
+  switch (accountMode) {
+    case "supplier":
+      return { role: "supplier" as const, canBuy: false, canSell: true };
+    case "both":
+      return { role: "buyer" as const, canBuy: true, canSell: true };
+    case "buyer":
+    default:
+      return { role: "buyer" as const, canBuy: true, canSell: false };
+  }
+}
+
 router.post("/auth/register", asyncHandler(async (req, res) => {
   const parsed = RegisterBody.safeParse(req.body);
   if (!parsed.success) {
@@ -17,6 +29,8 @@ router.post("/auth/register", asyncHandler(async (req, res) => {
     return;
   }
   const body = parsed.data;
+  const accountMode = body.accountMode ?? body.role ?? "buyer";
+  const capabilityConfig = resolveCapabilities(accountMode);
   const [existing] = await db.select().from(usersTable).where(eq(usersTable.email, body.email)).limit(1);
   if (existing) {
     res.status(409).json({ message: "Email already registered" });
@@ -26,7 +40,9 @@ router.post("/auth/register", asyncHandler(async (req, res) => {
   const [user] = await db.insert(usersTable).values({
     email: body.email,
     passwordHash,
-    role: body.role,
+    role: capabilityConfig.role,
+    canBuy: capabilityConfig.canBuy,
+    canSell: capabilityConfig.canSell,
     firstName: body.firstName,
     lastName: body.lastName,
     companyName: body.companyName,
@@ -36,7 +52,7 @@ router.post("/auth/register", asyncHandler(async (req, res) => {
     status: "active",
   }).returning();
 
-  if (body.role === "supplier") {
+  if (capabilityConfig.canSell) {
     const defaults = getPlanDefaults("trial");
     await db.insert(suppliersTable).values({
       userId: user.id,
@@ -100,7 +116,8 @@ router.post("/auth/logout", (_req, res) => {
 
 router.put("/auth/profile", requireAuth, asyncHandler(async (req, res) => {
   const user = (req as any).user;
-  const { firstName, lastName, companyName, phone, country, industry } = req.body;
+  const { firstName, lastName, companyName, phone, country, industry, accountMode } = req.body;
+  let nextCapabilities = accountMode !== undefined ? resolveCapabilities(accountMode) : null;
 
   const updates: any = { updatedAt: new Date() };
   if (firstName !== undefined) updates.firstName = firstName;
@@ -109,8 +126,44 @@ router.put("/auth/profile", requireAuth, asyncHandler(async (req, res) => {
   if (phone !== undefined) updates.phone = phone;
   if (country !== undefined) updates.country = country;
   if (industry !== undefined) updates.industry = industry;
+  if (accountMode !== undefined && user.role !== "admin") {
+    const capabilityConfig = resolveCapabilities(accountMode);
+    nextCapabilities = capabilityConfig;
+    updates.role = capabilityConfig.role;
+    updates.canBuy = capabilityConfig.canBuy;
+    updates.canSell = capabilityConfig.canSell;
+  }
 
   const [updated] = await db.update(usersTable).set(updates).where(eq(usersTable.id, user.id)).returning();
+
+  if (nextCapabilities?.canSell) {
+    const [existingSupplier] = await db.select().from(suppliersTable).where(eq(suppliersTable.userId, user.id)).limit(1);
+    if (!existingSupplier) {
+      const defaults = getPlanDefaults("trial");
+      await db.insert(suppliersTable).values({
+        userId: user.id,
+        companyName: updates.companyName ?? user.companyName,
+        country: updates.country ?? user.country,
+        commercialRegNumber: null,
+        warehouseLocation: null,
+        certifications: [],
+        verified: false,
+        responseRate: "0",
+        avgResponseTime: "24 hours",
+        supplierPlan: "trial",
+        subscriptionStatus: "trial",
+        trialEndsAt: getTrialEndDate(),
+        subscriptionStartedAt: new Date(),
+        billingCycle: defaults.billingCycle,
+        featuredSupplier: false,
+        productLimit: defaults.productLimit,
+        rfqAccessEnabled: defaults.rfqAccessEnabled,
+        storefrontVisible: true,
+        productsPublic: true,
+      });
+    }
+  }
+
   const { passwordHash: _, ...safeUser } = updated;
   res.json({ ...safeUser, avatarUrl: null });
 }));

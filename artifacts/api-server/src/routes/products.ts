@@ -5,7 +5,7 @@ import {
   productsTable, suppliersTable, categoriesTable
 } from "@workspace/db";
 import { eq, and, or, gte, lte, sql, desc, asc, ilike } from "drizzle-orm";
-import { requireAuth, requireRole, optionalAuth } from "../middlewares/auth";
+import { requireAuth, requireCanSell, optionalAuth } from "../middlewares/auth";
 import { asyncHandler } from "../middlewares/asyncHandler";
 import { CreateProductBody, UpdateProductBody } from "@workspace/api-zod";
 import { canSupplierAccessRfqs, hasReachedProductLimit, isSupplierSuspended } from "../lib/subscriptions";
@@ -331,7 +331,7 @@ router.get("/products/:id/related", asyncHandler(async (req, res) => {
   res.json(rows.map(r => buildProductShape(r.products, r.suppliers, r.categories, 0, null)));
 }));
 
-router.post("/products", parseProductRequest, requireAuth, requireRole("supplier"), asyncHandler(async (req, res) => {
+router.post("/products", parseProductRequest, requireAuth, requireCanSell, asyncHandler(async (req, res) => {
   const user = (req as any).user;
   const parsed = CreateProductBody.safeParse(normalizeCreateProductBody(req.body as Record<string, unknown>));
   if (!parsed.success) {
@@ -415,7 +415,7 @@ router.post("/products", parseProductRequest, requireAuth, requireRole("supplier
   res.status(201).json(buildProductShape(row.products, row.suppliers, row.categories, 0, null));
 }));
 
-router.put("/products/:id", requireAuth, requireRole("supplier"), asyncHandler(async (req, res) => {
+router.put("/products/:id", requireAuth, requireCanSell, asyncHandler(async (req, res) => {
   const user = (req as any).user;
   const id = parseInt(String(req.params.id));
   const parsed = UpdateProductBody.safeParse(normalizeUpdateProductBody(req.body as Record<string, unknown>));
@@ -508,7 +508,7 @@ router.put("/products/:id", requireAuth, requireRole("supplier"), asyncHandler(a
   res.json(buildProductShape(row.products, row.suppliers, row.categories, 0, null));
 }));
 
-router.delete("/products/:id", requireAuth, requireRole("supplier", "admin"), asyncHandler(async (req, res) => {
+router.delete("/products/:id", requireAuth, asyncHandler(async (req, res) => {
   const user = (req as any).user;
   const id = parseInt(String(req.params.id));
 

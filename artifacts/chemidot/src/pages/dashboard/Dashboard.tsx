@@ -1,5 +1,6 @@
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useAuth, getStoredToken } from "@/lib/auth";
+import { getPreferredDashboardMode, userCanBuy, userCanSell } from "@/lib/account-capabilities";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useGetBuyerStats, useGetSupplierStats } from "@workspace/api-client-react";
 import {
@@ -20,7 +21,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useRef } from "react";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { cn } from "@/lib/utils";
 
 /* ─── Shared helpers ─── */
@@ -231,7 +232,9 @@ function EditCompanyProfileDialog({ open, onClose, onSaved }: { open: boolean; o
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const search = useSearch();
   if (!user) return null;
+  const mode = getPreferredDashboardMode(user, search);
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -239,8 +242,8 @@ export default function Dashboard() {
           <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground text-sm">Welcome back, {user.firstName}. Here's what's happening today.</p>
         </div>
-        {user.role === "buyer" && <BuyerDashboard />}
-        {user.role === "supplier" && <SupplierDashboard />}
+        {userCanBuy(user) && mode === "buy" && <BuyerDashboard />}
+        {userCanSell(user) && mode === "sell" && <SupplierDashboard />}
         {user.role === "admin" && <div className="text-muted-foreground italic">Admin dashboard functionality is located in the Admin Panel tab.</div>}
       </div>
     </DashboardLayout>

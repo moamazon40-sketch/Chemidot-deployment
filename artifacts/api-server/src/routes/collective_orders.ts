@@ -5,7 +5,7 @@ import {
   productsTable, suppliersTable, categoriesTable, usersTable
 } from "@workspace/db";
 import { eq, and, sql, desc } from "drizzle-orm";
-import { requireAuth, requireRole } from "../middlewares/auth";
+import { canUserBuy, requireAuth, requireCanSell } from "../middlewares/auth";
 import { asyncHandler } from "../middlewares/asyncHandler";
 import { CreateCollectiveOrderBody, JoinCollectiveOrderBody } from "@workspace/api-zod";
 
@@ -106,7 +106,7 @@ router.get("/collective-orders", asyncHandler(async (req, res) => {
   });
 }));
 
-router.post("/collective-orders", requireAuth, requireRole("supplier", "admin"), asyncHandler(async (req, res) => {
+router.post("/collective-orders", requireAuth, requireCanSell, asyncHandler(async (req, res) => {
   const user = (req as any).user;
   const parsed = CreateCollectiveOrderBody.safeParse(req.body);
   if (!parsed.success) {
@@ -249,6 +249,10 @@ router.get("/collective-orders/:id", asyncHandler(async (req, res) => {
 router.post("/collective-orders/:id/join", requireAuth, asyncHandler(async (req, res) => {
   const user = (req as any).user;
   const id = parseInt(String(req.params.id));
+  if (!canUserBuy(user)) {
+    res.status(403).json({ message: "Buying capability is required for this action." });
+    return;
+  }
   const parsed = JoinCollectiveOrderBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ message: "Invalid request body", errors: parsed.error.issues });
@@ -277,6 +281,11 @@ router.post("/collective-orders/:id/join", requireAuth, asyncHandler(async (req,
     // Check if order is still open for joining
     if (co.status !== "open") {
       throw httpError("Cannot join an order that is not open", 400);
+    }
+
+    const [ownSupplier] = await tx.select().from(suppliersTable).where(eq(suppliersTable.userId, user.id)).limit(1);
+    if (ownSupplier && ownSupplier.id === co.supplierId) {
+      throw httpError("You cannot join your own collective order as a buyer.", 400);
     }
     
     // Check if deadline has passed
@@ -334,6 +343,10 @@ router.post("/collective-orders/:id/join", requireAuth, asyncHandler(async (req,
 router.post("/collective-orders/:id/leave", requireAuth, asyncHandler(async (req, res) => {
   const user = (req as any).user;
   const id = parseInt(String(req.params.id));
+  if (!canUserBuy(user)) {
+    res.status(403).json({ message: "Buying capability is required for this action." });
+    return;
+  }
   
   // Use transaction to prevent data inconsistency
   await db.transaction(async (tx) => {

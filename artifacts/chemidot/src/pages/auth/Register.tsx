@@ -4,8 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Building2, ShoppingCart, CheckSquare, Square } from "lucide-react";
-import { useRegister, RegisterBodyRole } from "@workspace/api-client-react";
+import { Building2, ShoppingCart, CheckSquare, Square, ArrowLeftRight } from "lucide-react";
+import { useRegister, RegisterBodyAccountMode } from "@workspace/api-client-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -20,6 +20,15 @@ const INDUSTRY_KEYS = [
 ] as const;
 
 type IndustryKey = typeof INDUSTRY_KEYS[number];
+type AccountMode = RegisterBodyAccountMode;
+
+function modeIncludesBuying(mode: AccountMode) {
+  return mode === "buyer" || mode === "both";
+}
+
+function modeIncludesSelling(mode: AccountMode) {
+  return mode === "supplier" || mode === "both";
+}
 
 export default function Register() {
   const { login } = useAuth();
@@ -29,7 +38,7 @@ export default function Register() {
   const { handleError } = useApiError();
   
   const [step, setStep] = useState<1 | 2>(1);
-  const [role, setRole] = useState<RegisterBodyRole>("buyer");
+  const [accountMode, setAccountMode] = useState<AccountMode>("buyer");
   const [selectedIndustries, setSelectedIndustries] = useState<Set<IndustryKey>>(new Set());
   const [formData, setFormData] = useState({
     email: "",
@@ -57,7 +66,7 @@ export default function Register() {
 
   const handleStep1Submit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (role === "buyer") {
+    if (modeIncludesBuying(accountMode)) {
       setStep(2);
     } else {
       doRegister();
@@ -70,7 +79,7 @@ export default function Register() {
       : (selectedIndustries.size > 0 ? JSON.stringify(Array.from(selectedIndustries)) : undefined);
 
     registerMutation.mutate(
-      { data: { ...formData, role, industry: industryValue } },
+      { data: { ...formData, accountMode, role: accountMode === "both" ? "buyer" : accountMode, industry: industryValue } },
       {
         onSuccess: (data) => {
           login(data.token, data.user);
@@ -102,7 +111,7 @@ export default function Register() {
         </div>
 
         {/* Step indicator for buyers */}
-        {role === "buyer" && (
+        {modeIncludesBuying(accountMode) && (
           <div className="flex items-center justify-center gap-3">
             <div className={`flex items-center gap-2 text-sm font-medium ${step === 1 ? "text-primary" : "text-muted-foreground"}`}>
               <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${step === 1 ? "bg-primary text-primary-foreground" : "bg-primary/20 text-primary"}`}>1</span>
@@ -127,7 +136,7 @@ export default function Register() {
                 
                 <div className="space-y-3">
                   <Label>{t.iWantToUseAs}</Label>
-                  <RadioGroup defaultValue="buyer" onValueChange={(v: any) => setRole(v)} className="grid grid-cols-2 gap-4">
+                  <RadioGroup defaultValue="buyer" onValueChange={(v: AccountMode) => setAccountMode(v)} className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                     <div>
                       <RadioGroupItem value="buyer" id="role-buyer" className="peer sr-only" />
                       <Label
@@ -150,6 +159,17 @@ export default function Register() {
                         <span className="text-xs text-muted-foreground font-normal mt-1">{t.sellProducts}</span>
                       </Label>
                     </div>
+                    <div>
+                      <RadioGroupItem value="both" id="role-both" className="peer sr-only" />
+                      <Label
+                        htmlFor="role-both"
+                        className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5 cursor-pointer transition-all"
+                      >
+                        <ArrowLeftRight className="mb-2 h-6 w-6" />
+                        <span className="font-semibold">Both</span>
+                        <span className="text-xs text-muted-foreground font-normal mt-1">Buy and sell chemicals</span>
+                      </Label>
+                    </div>
                   </RadioGroup>
                 </div>
 
@@ -169,7 +189,7 @@ export default function Register() {
                   <Input id="companyName" required value={formData.companyName} onChange={handleChange} disabled={registerMutation.isPending} />
                 </div>
 
-                {role === "supplier" && (
+                {modeIncludesSelling(accountMode) && (
                   <div className="space-y-2">
                     <Label htmlFor="commercialRegNumber">{t.commercialReg}</Label>
                     <Input id="commercialRegNumber" required value={formData.commercialRegNumber} onChange={handleChange} disabled={registerMutation.isPending} />
@@ -202,7 +222,7 @@ export default function Register() {
                 <Button type="submit" className="w-full" size="lg" disabled={registerMutation.isPending}>
                   {registerMutation.isPending
                     ? t.creatingAccount
-                    : role === "buyer" ? t.continueStep : t.createAccountBtn}
+                    : modeIncludesBuying(accountMode) ? t.continueStep : t.createAccountBtn}
                 </Button>
                 <div className="text-center text-sm text-muted-foreground">
                   {t.alreadyHaveAccount}{" "}
