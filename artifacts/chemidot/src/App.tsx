@@ -82,6 +82,7 @@ function Router() {
         <Route path="/collective-orders/:id" component={CollectiveOrderDetail} />
         <Route path="/about" component={About} />
         <Route path="/for-suppliers" component={ForSuppliers} />
+        <Route path="/pricing" component={ForSuppliers} />
         <Route path="/for-buyers" component={ForBuyers} />
         <Route path="/contact" component={Contact} />
         <Route path="/rfq" component={RFQ} />

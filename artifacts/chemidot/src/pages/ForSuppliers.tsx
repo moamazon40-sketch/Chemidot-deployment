@@ -52,7 +52,14 @@ const PRICING_PLANS = [
     cta: "Start Free Trial",
     href: "/auth/register",
     featured: false,
-    features: ["Up to 3 products", "Basic supplier storefront", "Basic SDS/TDS support", "Up to 10 RFQs", "No premium exposure"],
+    features: [
+      "Up to 3 products",
+      "Basic supplier storefront",
+      "Basic SDS/TDS support",
+      "Up to 10 RFQs",
+      "Buy and sell from one company account",
+      "No premium exposure",
+    ],
   },
   {
     name: "Starter",
@@ -61,7 +68,15 @@ const PRICING_PLANS = [
     cta: "Start Free Trial",
     href: "/auth/register",
     featured: false,
-    features: ["Up to 10 products", "Public storefront", "Basic RFQ access", "Buyer inquiries", "Standard marketplace visibility", "SDS/TDS uploads"],
+    features: [
+      "Up to 10 products",
+      "Public storefront",
+      "Basic RFQ access",
+      "Buyer inquiries",
+      "Buy and sell from one company account",
+      "Standard marketplace visibility",
+      "SDS/TDS uploads",
+    ],
   },
   {
     name: "Growth",
@@ -70,7 +85,19 @@ const PRICING_PLANS = [
     cta: "Start Free Trial",
     href: "/auth/register",
     featured: true,
-    features: ["Up to 50 products", "Better marketplace ranking", "RFQ response access", "Featured product slots", "Supplier badge", "Basic analytics", "Priority support"],
+    features: [
+      "Up to 50 products",
+      "Buy and sell from one company account",
+      "Dual buyer/supplier dashboard",
+      "Manage RFQs, product listings, and collective orders from one account",
+      "Suitable for distributors, traders, and manufacturers",
+      "Better marketplace ranking",
+      "RFQ response access",
+      "Featured product slots",
+      "Supplier badge",
+      "Basic analytics",
+      "Priority support",
+    ],
   },
   {
     name: "Enterprise",
@@ -79,7 +106,19 @@ const PRICING_PLANS = [
     cta: "Contact Sales",
     href: "/contact",
     featured: false,
-    features: ["High or unlimited catalog", "Premium placement", "Homepage featured supplier", "Custom onboarding", "Dedicated account handling", "Manual invoicing", "Future API/ERP support"],
+    features: [
+      "High or unlimited catalog",
+      "Buy and sell from one company account",
+      "Dual buyer/supplier dashboard",
+      "Manage RFQs, product listings, and collective orders from one account",
+      "Suitable for distributors, traders, and manufacturers",
+      "Premium placement",
+      "Homepage featured supplier",
+      "Custom onboarding",
+      "Dedicated account handling",
+      "Manual invoicing",
+      "Future API/ERP support",
+    ],
   },
 ];
 
@@ -244,6 +283,12 @@ export default function ForSuppliers() {
                 </div>
               </div>
             ))}
+          </div>
+          <div className="mx-auto mt-10 max-w-3xl rounded-2xl border border-border bg-white px-6 py-7 text-center shadow-card-premium">
+            <h3 className="text-2xl font-bold text-primary">Built for Chemical Trading Workflows</h3>
+            <p className="mt-3 text-base leading-relaxed text-muted-foreground">
+              In the chemical market, the same company may buy raw materials, sell chemicals, and trade products across different categories. Chemidot supports one company account that can buy, sell, or do both.
+            </p>
           </div>
         </div>
       </section>
