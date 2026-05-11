@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
-import { userCanBuy, userCanSell } from "@/lib/account-capabilities";
+import { getDashboardOverviewRoute, getPreferredDashboardMode, userCanBuy, userCanSell } from "@/lib/account-capabilities";
 
 type Options = {
   requiredRole?: "buyer" | "supplier" | "admin";
@@ -13,6 +13,7 @@ export function useProtectedRoute(options: Options = {}) {
   const { user, isLoading } = useAuth();
   const [, navigate] = useLocation();
   const { requiredRole, requiredCapability, redirectTo = "/auth/login" } = options;
+  const safeDashboardFallback = user ? getDashboardOverviewRoute(getPreferredDashboardMode(user, window.location.search)) : "/dashboard";
 
   useEffect(() => {
     if (isLoading) return;
@@ -21,17 +22,17 @@ export function useProtectedRoute(options: Options = {}) {
       return;
     }
     if (requiredRole && user.role !== requiredRole && user.role !== "admin") {
-      navigate("/dashboard");
+      navigate(safeDashboardFallback);
       return;
     }
     if (requiredCapability === "buy" && !userCanBuy(user)) {
-      navigate("/dashboard");
+      navigate(safeDashboardFallback);
       return;
     }
     if (requiredCapability === "sell" && !userCanSell(user)) {
-      navigate("/dashboard");
+      navigate(safeDashboardFallback);
     }
-  }, [user, isLoading, requiredRole, requiredCapability, redirectTo, navigate]);
+  }, [user, isLoading, requiredRole, requiredCapability, redirectTo, navigate, safeDashboardFallback]);
 
   return { user, isLoading };
 }

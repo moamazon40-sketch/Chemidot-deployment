@@ -1,6 +1,14 @@
 import { Link, useLocation, useSearch } from "wouter";
 import { useAuth } from "@/lib/auth";
-import { getPreferredDashboardMode, userCanBuy, userCanSell, withDashboardMode, type DashboardMode } from "@/lib/account-capabilities";
+import {
+  getDashboardOverviewRoute,
+  getPreferredDashboardMode,
+  getSafeDashboardModeRoute,
+  userCanBuy,
+  userCanSell,
+  withDashboardMode,
+  type DashboardMode,
+} from "@/lib/account-capabilities";
 import {
   LayoutDashboard, Package, FileText, Users, Settings, LogOut,
   MessageSquare, Store, ShoppingCart, User, ArrowLeftRight
@@ -127,6 +135,8 @@ function AppSidebar({ groups, mode }: { groups: NavGroup[]; mode: DashboardMode 
   const { logout, user } = useAuth();
   const isCollapsed = state === "collapsed";
   const dualMode = userCanBuy(user) && userCanSell(user) && user?.role !== "admin";
+  const buySwitchHref = getSafeDashboardModeRoute(location, search, "buy", user);
+  const sellSwitchHref = getSafeDashboardModeRoute(location, search, "sell", user);
 
   return (
     <Sidebar collapsible="icon">
@@ -148,7 +158,7 @@ function AppSidebar({ groups, mode }: { groups: NavGroup[]; mode: DashboardMode 
             {dualMode && (
               <div className="mt-2 grid grid-cols-2 gap-1 rounded-lg border border-sidebar-border/60 bg-sidebar-accent/40 p-1">
                 <Link
-                  href={withDashboardMode(location + search, "buy")}
+                  href={buySwitchHref}
                   className={cn(
                     "rounded-md px-2 py-1 text-center text-[11px] font-medium",
                     mode === "buy" ? "bg-background text-foreground shadow-sm" : "text-sidebar-foreground/70"
@@ -157,7 +167,7 @@ function AppSidebar({ groups, mode }: { groups: NavGroup[]; mode: DashboardMode 
                   Buying
                 </Link>
                 <Link
-                  href={withDashboardMode(location + search, "sell")}
+                  href={sellSwitchHref}
                   className={cn(
                     "rounded-md px-2 py-1 text-center text-[11px] font-medium",
                     mode === "sell" ? "bg-background text-foreground shadow-sm" : "text-sidebar-foreground/70"
@@ -231,6 +241,7 @@ function TopNav() {
 
   const mode = getPreferredDashboardMode(user, search);
   const dualMode = userCanBuy(user) && userCanSell(user) && user?.role !== "admin";
+  const switchTarget = getSafeDashboardModeRoute(location, search, mode === "buy" ? "sell" : "buy", user);
   const roleLabel = user?.role === "admin"
     ? "Admin"
     : dualMode
@@ -250,7 +261,7 @@ function TopNav() {
       <div className="flex items-center gap-2">
         {dualMode && (
           <Button variant="outline" size="sm" asChild className="hidden sm:inline-flex gap-1.5">
-            <Link href={withDashboardMode(location + search, mode === "buy" ? "sell" : "buy")}>
+            <Link href={switchTarget}>
               <ArrowLeftRight className="h-3.5 w-3.5" />
               {mode === "buy" ? "Switch to Selling" : "Switch to Buying"}
             </Link>
@@ -285,7 +296,7 @@ function TopNav() {
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <Link href="/dashboard/settings" className="cursor-pointer">
+              <Link href={user?.role === "admin" ? "/dashboard/settings" : getSafeDashboardModeRoute("/dashboard/settings", "", mode, user)} className="cursor-pointer">
                 <User className="mr-2 h-4 w-4" />
                 Profile Settings
               </Link>
@@ -318,6 +329,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const unreadCount = messageUnreadCount;
   const rfqUnreadCount = notifs?.filter((n: any) => n.relatedType === "rfq").length ?? 0;
   const orderUnreadCount = notifs?.filter((n: any) => n.relatedType === "order").length ?? 0;
+  const fallbackMode = getPreferredDashboardMode(user, search);
 
   if (!user) {
     return (
@@ -346,11 +358,35 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     );
   }
 
-  const groups = buildNavGroups(user, mode, t, unreadCount, rfqUnreadCount, orderUnreadCount);
+  if (user.role !== "admin" && !userCanBuy(user) && !userCanSell(user)) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center px-6">
+        <div className="w-full max-w-md text-center space-y-4">
+          <Link href="/" className="inline-flex items-center justify-center gap-2 font-bold text-lg">
+            <img src={logoImage} alt="Chemidot" className="h-9 w-9 object-contain" />
+            Chemidot
+          </Link>
+          <div className="rounded-lg border bg-card p-6 shadow-sm space-y-3">
+            <h1 className="text-xl font-semibold">Dashboard unavailable</h1>
+            <p className="text-sm text-muted-foreground">
+              This account does not currently have buying or selling access.
+            </p>
+            <div className="flex justify-center gap-2 pt-2">
+              <Button asChild>
+                <Link href="/">Go home</Link>
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const groups = buildNavGroups(user, fallbackMode, t, unreadCount, rfqUnreadCount, orderUnreadCount);
 
   return (
     <SidebarProvider defaultOpen={true}>
-      <AppSidebar groups={groups} mode={mode} />
+      <AppSidebar groups={groups} mode={fallbackMode} />
       <SidebarInset className="flex flex-col min-h-screen min-w-0">
         <TopNav />
         <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-auto">

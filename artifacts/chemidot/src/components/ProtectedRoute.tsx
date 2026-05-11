@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { Skeleton } from "@/components/ui/skeleton";
-import { userCanBuy, userCanSell } from "@/lib/account-capabilities";
+import { getDashboardOverviewRoute, getPreferredDashboardMode, userCanBuy, userCanSell } from "@/lib/account-capabilities";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -19,6 +19,7 @@ export function ProtectedRoute({
 }: ProtectedRouteProps) {
   const { user, isLoading } = useAuth();
   const [, navigate] = useLocation();
+  const safeDashboardFallback = user ? getDashboardOverviewRoute(getPreferredDashboardMode(user, window.location.search)) : "/dashboard";
 
   useEffect(() => {
     if (isLoading) return;
@@ -27,17 +28,17 @@ export function ProtectedRoute({
       return;
     }
     if (requiredRole && user.role !== requiredRole && user.role !== "admin") {
-      navigate("/dashboard");
+      navigate(safeDashboardFallback);
       return;
     }
     if (requiredCapability === "buy" && !userCanBuy(user)) {
-      navigate("/dashboard");
+      navigate(safeDashboardFallback);
       return;
     }
     if (requiredCapability === "sell" && !userCanSell(user)) {
-      navigate("/dashboard");
+      navigate(safeDashboardFallback);
     }
-  }, [user, isLoading, requiredRole, requiredCapability, redirectTo, navigate]);
+  }, [user, isLoading, requiredRole, requiredCapability, redirectTo, navigate, safeDashboardFallback]);
 
   if (isLoading) {
     return (
