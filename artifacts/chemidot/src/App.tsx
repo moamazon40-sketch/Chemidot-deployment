@@ -8,6 +8,7 @@ import { lazy, Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollToTop } from "@/components/ScrollToTop";
 import { PageTransition } from "@/components/PageTransition";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 
 import NotFound from "@/pages/not-found";
 
@@ -119,6 +120,7 @@ function App() {
               <Router />
             </WouterRouter>
             <Toaster />
+            <SpeedInsights />
           </TooltipProvider>
         </AuthProvider>
       </ThemeProvider>
