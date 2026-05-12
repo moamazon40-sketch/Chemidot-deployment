@@ -8,6 +8,7 @@ import { lazy, Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollToTop } from "@/components/ScrollToTop";
 import { PageTransition } from "@/components/PageTransition";
+import { Analytics } from "@vercel/analytics/react";
 
 import NotFound from "@/pages/not-found";
 
@@ -122,6 +123,7 @@ function App() {
           </TooltipProvider>
         </AuthProvider>
       </ThemeProvider>
+      <Analytics />
     </QueryClientProvider>
   );
 }
