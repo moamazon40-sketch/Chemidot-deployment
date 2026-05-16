@@ -12,7 +12,7 @@
                     "update:supplier-shop-urls":  "tsx ./src/update-supplier-shop-urls.ts",
                     "typecheck":  "tsc -p tsconfig.json --noEmit",
                     "cleanup:test-data":  "tsx ./src/cleanup-test-data.ts",
-                    "admin:promote":  "tsx ./src/promote-admin.ts"
+                    "admin:promote":  "tsx ./src/promote-admin-by-email.ts"
                 },
     "dependencies":  {
                          "@workspace/db":  "workspace:*",
