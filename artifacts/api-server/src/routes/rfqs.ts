@@ -151,7 +151,12 @@ router.get("/rfqs", requireAuth, asyncHandler(async (req, res) => {
           for (const p of supplierProducts) {
             if (p.name) {
               const escapedName = p.name.replace(/[%_\\]/g, '\\$&');
-              matchConditions.push(ilike(rfqsTable.productName, `%${escapedName}%`));
+              // Allow matching when either side uses the broader product label,
+              // e.g. RFQ "Methanol" vs supplier product "Methanol 99.9%".
+              matchConditions.push(or(
+                ilike(rfqsTable.productName, `%${escapedName}%`),
+                sql`${p.name} ilike ('%' || ${rfqsTable.productName} || '%')`,
+              ));
             }
             if (p.casNumber) {
               matchConditions.push(eq(rfqsTable.casNumber, p.casNumber));
