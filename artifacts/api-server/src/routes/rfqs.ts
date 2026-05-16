@@ -32,6 +32,48 @@ function buildRfq(r: any, quotationCount: number, buyerCompanyName: string) {
   };
 }
 
+async function getSupplierProductsForMatching(supplierId: number) {
+  return db.select({
+    id: productsTable.id,
+    name: productsTable.name,
+    casNumber: productsTable.casNumber,
+    categoryId: productsTable.categoryId,
+  }).from(productsTable).where(eq(productsTable.supplierId, supplierId));
+}
+
+function namesMatchEitherWay(rfqProductName: string | null | undefined, supplierProductName: string | null | undefined) {
+  const rfqName = rfqProductName?.trim().toLowerCase();
+  const supplierName = supplierProductName?.trim().toLowerCase();
+  if (!rfqName || !supplierName) return false;
+  return rfqName.includes(supplierName) || supplierName.includes(rfqName);
+}
+
+async function canSupplierAccessRfqDetail(
+  supplier: typeof suppliersTable.$inferSelect | undefined,
+  rfq: typeof rfqsTable.$inferSelect,
+) {
+  if (!supplier || isSupplierSuspended(supplier)) return false;
+  if (rfq.supplierId === supplier.id) return true;
+
+  const supplierProducts = await getSupplierProductsForMatching(supplier.id);
+  if (supplierProducts.some((product) => product.id === rfq.productId)) return true;
+  if (!canSupplierAccessRfqs(supplier)) return false;
+
+  if (rfq.categoryId && supplierProducts.some((product) => product.categoryId === rfq.categoryId)) {
+    return true;
+  }
+
+  if (supplierProducts.some((product) => namesMatchEitherWay(rfq.productName, product.name))) {
+    return true;
+  }
+
+  if (rfq.casNumber && supplierProducts.some((product) => product.casNumber === rfq.casNumber)) {
+    return true;
+  }
+
+  return false;
+}
+
 async function notifyUser(input: {
   userId?: number | null;
   type: "rfq_update" | "new_quotation" | "order_update" | "collective_milestone" | "payment_reminder" | "system";
@@ -125,12 +167,7 @@ router.get("/rfqs", requireAuth, asyncHandler(async (req, res) => {
         limitNum = Math.min(limitNum, visibleTotalCap);
       }
 
-      const supplierProducts = await db.select({
-        id: productsTable.id,
-        name: productsTable.name,
-        casNumber: productsTable.casNumber,
-        categoryId: productsTable.categoryId,
-      }).from(productsTable).where(eq(productsTable.supplierId, supplier.id));
+      const supplierProducts = await getSupplierProductsForMatching(supplier.id);
 
       const matchConditions: any[] = [eq(rfqsTable.supplierId, supplier.id)];
 
@@ -387,21 +424,23 @@ router.get("/rfqs/:id", requireAuth, asyncHandler(async (req, res) => {
     ? await db.select().from(suppliersTable).where(eq(suppliersTable.userId, user.id)).limit(1)
     : [undefined];
   const isBuyer = row.rfqs.buyerId === user.id;
-  const isSupplier = !!supplier && (
-    row.rfqs.supplierId === supplier.id ||
-    quotations.some((quotation) => quotation.quotations.supplierId === supplier.id)
-  );
+  const isSupplier = await canSupplierAccessRfqDetail(supplier, row.rfqs);
+  const visibleQuotations = isBuyer || user.role === "admin"
+    ? quotations
+    : supplier
+      ? quotations.filter((quotation) => quotation.quotations.supplierId === supplier.id)
+      : [];
   if (!isBuyer && !isSupplier && user.role !== "admin") {
     res.status(403).json({ message: "Forbidden" });
     return;
   }
 
-  const rfqBase = buildRfq(row.rfqs, quotations.length, row.users?.companyName ?? "");
+  const rfqBase = buildRfq(row.rfqs, visibleQuotations.length, row.users?.companyName ?? "");
   res.json({
     ...rfqBase,
     description: row.rfqs.description,
     specifications: row.rfqs.specifications,
-    quotations: quotations.map(q => ({
+    quotations: visibleQuotations.map(q => ({
       id: q.quotations.id,
       rfqId: q.quotations.rfqId,
       supplierId: q.quotations.supplierId,
@@ -435,15 +474,20 @@ router.get("/rfqs/:id/quotations", requireAuth, asyncHandler(async (req, res) =>
     ? await db.select().from(suppliersTable).where(eq(suppliersTable.userId, user.id)).limit(1)
     : [undefined];
   const isBuyer = rfqOwner.buyerId === user.id;
-  const isSupplier = !!supplier && quotations.some((quotation) => quotation.quotations.supplierId === supplier.id);
+  const [rfq] = await db.select().from(rfqsTable).where(eq(rfqsTable.id, id)).limit(1);
+  const isSupplier = !!rfq && await canSupplierAccessRfqDetail(supplier, rfq);
   if (!isBuyer && !isSupplier && user.role !== "admin") {
     res.status(403).json({ message: "Forbidden" });
     return;
   }
 
-  const [rfq] = await db.select().from(rfqsTable).where(eq(rfqsTable.id, id)).limit(1);
+  const visibleQuotations = isBuyer || user.role === "admin"
+    ? quotations
+    : supplier
+      ? quotations.filter((quotation) => quotation.quotations.supplierId === supplier.id)
+      : [];
 
-  res.json(quotations.map(q => ({
+  res.json(visibleQuotations.map(q => ({
     id: q.quotations.id,
     rfqId: q.quotations.rfqId,
     supplierId: q.quotations.supplierId,
@@ -494,17 +538,9 @@ router.post("/rfqs/:id/quotations", requireAuth, requireCanSell, asyncHandler(as
     return;
   }
 
-  let isDirectRfqForSupplier = rfq.supplierId === supplier.id;
-  if (!isDirectRfqForSupplier && rfq.productId) {
-    const [linkedProduct] = await db.select({ supplierId: productsTable.supplierId })
-      .from(productsTable)
-      .where(eq(productsTable.id, rfq.productId))
-      .limit(1);
-    isDirectRfqForSupplier = linkedProduct?.supplierId === supplier.id;
-  }
-
-  if (isSupplierSuspended(supplier) || (!isDirectRfqForSupplier && !canSupplierAccessRfqs(supplier))) {
-    res.status(403).json({ message: "RFQ access is not available for your current supplier plan or subscription status." });
+  const canAccessRfq = await canSupplierAccessRfqDetail(supplier, rfq);
+  if (!canAccessRfq) {
+    res.status(403).json({ message: "You are not eligible to quote on this RFQ." });
     return;
   }
   
