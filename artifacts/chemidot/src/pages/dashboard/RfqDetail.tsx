@@ -6,6 +6,13 @@ import {
   useSubmitQuotation,
   useListNegotiationMessages,
   useSendNegotiationMessage,
+  useAcceptQuotation,
+  useRejectQuotation,
+  getGetRfqQueryKey,
+  getListRfqQuotationsQueryKey,
+  getListRfqsQueryKey,
+  getListOrdersQueryKey,
+  getListNotificationsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -318,6 +325,8 @@ export default function RfqDetail() {
   const qc = useQueryClient();
   const [rejectingQid, setRejectingQid] = useState<number | null>(null);
   const [sortBy, setSortBy] = useState<"price" | "time" | "date">("price");
+  const acceptQuotation = useAcceptQuotation();
+  const rejectQuotation = useRejectQuotation();
 
   const { data: rfq, isLoading, refetch } = useGetRfq(id, { query: { enabled: !!id } as any });
   const { data: quotations, isLoading: quotLoading, refetch: refetchQuotations } = useListRfqQuotations(id, { query: { enabled: !!id } as any });
@@ -336,36 +345,36 @@ export default function RfqDetail() {
     });
   }, [id, qc, user]);
 
-  const handleAccept = async (quotationId: number, supplierName: string) => {
-    try {
-      const token = localStorage.getItem("chemidot_token");
-      const res = await fetch(`/api/rfqs/${id}/quotations/${quotationId}/accept`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      });
-      if (!res.ok) throw new Error("Failed");
-      toast({ title: "Quotation accepted!", description: `Order created with ${supplierName}` });
-      navigate(withDashboardMode("/dashboard/orders", "buy"));
-    } catch {
-      toast({ title: "Error", description: "Could not accept quotation", variant: "destructive" });
-    }
+  const refreshRfqFlow = () => {
+    qc.invalidateQueries({ queryKey: getGetRfqQueryKey(id) });
+    qc.invalidateQueries({ queryKey: getListRfqQuotationsQueryKey(id) });
+    qc.invalidateQueries({ queryKey: getListRfqsQueryKey({ view: mode }) });
+    qc.invalidateQueries({ queryKey: getListOrdersQueryKey({ view: "buy" }) });
+    qc.invalidateQueries({ queryKey: getListNotificationsQueryKey() });
   };
 
-  const handleReject = async (quotationId: number) => {
-    try {
-      const token = localStorage.getItem("chemidot_token");
-      const res = await fetch(`/api/rfqs/${id}/quotations/${quotationId}/reject`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      });
-      if (!res.ok) throw new Error("Failed");
-      toast({ title: "Quotation rejected" });
-      setRejectingQid(null);
-      refetch();
-      refetchQuotations();
-    } catch {
-      toast({ title: "Error", description: "Could not reject quotation", variant: "destructive" });
-    }
+  const handleAccept = (quotationId: number, supplierName: string) => {
+    acceptQuotation.mutate({ id, qid: quotationId }, {
+      onSuccess: () => {
+        toast({ title: "Quotation accepted!", description: `Order created with ${supplierName}` });
+        refreshRfqFlow();
+        navigate(withDashboardMode("/dashboard/orders", "buy"));
+      },
+      onError: () => toast({ title: "Error", description: "Could not accept quotation", variant: "destructive" }),
+    });
+  };
+
+  const handleReject = (quotationId: number) => {
+    rejectQuotation.mutate({ id, qid: quotationId }, {
+      onSuccess: () => {
+        toast({ title: "Quotation rejected" });
+        setRejectingQid(null);
+        refreshRfqFlow();
+        refetch();
+        refetchQuotations();
+      },
+      onError: () => toast({ title: "Error", description: "Could not reject quotation", variant: "destructive" }),
+    });
   };
 
   if (isLoading) {
@@ -679,6 +688,7 @@ export default function RfqDetail() {
                                 variant={isBest ? "default" : "outline"}
                                 className="gap-1.5"
                                 onClick={() => handleAccept(q.id, q.supplierName)}
+                                disabled={acceptQuotation.isPending}
                               >
                                 <CheckCircle2 className="w-3.5 h-3.5" />
                                 Accept
@@ -688,6 +698,7 @@ export default function RfqDetail() {
                                 variant="outline"
                                 className="gap-1.5 text-destructive hover:text-destructive"
                                 onClick={() => setRejectingQid(q.id)}
+                                disabled={rejectQuotation.isPending}
                               >
                                 <XCircle className="w-3.5 h-3.5" />
                                 Reject

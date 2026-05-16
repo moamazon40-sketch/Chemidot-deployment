@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { conversationsTable, messagesTable, usersTable, suppliersTable } from "@workspace/db";
 import { eq, or, desc, and, ne, sql } from "drizzle-orm";
-import { requireAuth } from "../middlewares/auth";
+import { canUserBuy, requireAuth } from "../middlewares/auth";
 import { asyncHandler } from "../middlewares/asyncHandler";
 import { SendMessageBody } from "@workspace/api-zod";
 
@@ -14,6 +14,10 @@ router.post("/messages/start", requireAuth, asyncHandler(async (req, res) => {
 
   if (!supplierId) {
     res.status(400).json({ message: "supplierId is required" });
+    return;
+  }
+  if (!canUserBuy(user)) {
+    res.status(403).json({ message: "Buying capability is required to start supplier conversations." });
     return;
   }
 

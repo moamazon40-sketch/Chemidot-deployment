@@ -119,6 +119,28 @@ function parseDateOrNull(value?: string | null) {
   return new Date(value);
 }
 
+function capabilitiesForAdminRole(role: string) {
+  if (role === "admin") return { role: "admin" as const, canBuy: true, canSell: true };
+  if (role === "supplier") return { role: "supplier" as const, canBuy: false, canSell: true };
+  return { role: "buyer" as const, canBuy: true, canSell: false };
+}
+
+async function ensureSupplierProfileForUser(userId: number) {
+  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+  if (!user) return;
+  const [existing] = await db.select({ id: suppliersTable.id }).from(suppliersTable).where(eq(suppliersTable.userId, userId)).limit(1);
+  if (existing) return;
+  await db.insert(suppliersTable).values({
+    userId,
+    companyName: user.companyName || `${user.firstName} ${user.lastName}`.trim() || user.email,
+    country: user.country || "Saudi Arabia",
+    commercialRegNumber: null,
+    description: null,
+    certifications: [],
+    verified: false,
+  });
+}
+
 function toIso(value: Date | string | null | undefined) {
   if (!value) return null;
   const date = value instanceof Date ? value : new Date(value);
@@ -273,7 +295,11 @@ router.put("/admin/users/:id/role", requireAuth, requireRole("admin"), asyncHand
     res.status(400).json({ message: "Invalid role" });
     return;
   }
-  await db.update(usersTable).set({ role: role as any, updatedAt: new Date() }).where(eq(usersTable.id, id));
+  const capabilityPatch = capabilitiesForAdminRole(role);
+  await db.update(usersTable).set({ ...capabilityPatch, updatedAt: new Date() }).where(eq(usersTable.id, id));
+  if (capabilityPatch.canSell) {
+    await ensureSupplierProfileForUser(id);
+  }
   res.json({ message: "User role updated" });
 }));
 

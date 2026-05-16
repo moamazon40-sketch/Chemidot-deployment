@@ -600,7 +600,7 @@ router.post("/rfqs/:id/quotations/:qid/accept", requireAuth, asyncHandler(async 
       supplierId: quotation.quotations.supplierId,
       rfqId,
       quotationId: qid,
-      productId: null,
+      productId: rfq.productId ?? null,
       productName: rfq.productName,
       quantity: rfq.quantity,
       unit: rfq.unit,

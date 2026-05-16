@@ -1,14 +1,14 @@
-import express, { type Express, type Request, type Response, type NextFunction } from "express";
+import express, { type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
 import helmet from "helmet";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
-import pinoHttp from "pino-http";
+import { pinoHttp } from "pino-http";
 import path from "path";
 import fs from "fs";
 import router from "./routes";
 import { logger } from "./lib/logger";
 
-const app: Express = express();
+const app = express();
 
 app.set("trust proxy", 1);
 

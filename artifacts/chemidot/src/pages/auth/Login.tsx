@@ -11,6 +11,13 @@ import { useLanguage } from "@/lib/i18n";
 import { useApiError } from "@/hooks/use-api-error";
 import logoImage from "@assets/Copy_of_Untitled_Design_1777818624833.png";
 
+function getPostAuthRedirect() {
+  const params = new URLSearchParams(window.location.search);
+  const requested = params.get("return");
+  if (requested?.startsWith("/") && !requested.startsWith("//")) return requested;
+  return sessionStorage.getItem("rfq_prefill") ? "/rfq" : "/dashboard";
+}
+
 export default function Login() {
   const { login } = useAuth();
   const { t } = useLanguage();
@@ -27,7 +34,7 @@ export default function Login() {
       {
         onSuccess: (data) => {
           login(data.token, data.user);
-          window.location.href = "/dashboard";
+          window.location.href = getPostAuthRedirect();
         },
         onError: (err) => handleError(err, "Please check your credentials and try again."),
       }

@@ -52,6 +52,14 @@ export default function CollectiveOrderDetail() {
     deliveryCostMode: "quoted_after_supplier_offer",
     notes: "",
   });
+  const [allocationForm, setAllocationForm] = useState({
+    finalQty: "",
+    deliveryCity: "",
+    deliveryAddress: "",
+    contactName: "",
+    contactPhone: "",
+    contactEmail: "",
+  });
 
   const { data: order, isLoading, refetch } = useGetCollectiveOrder(id, {
     query: { enabled: !!id } as any
@@ -99,7 +107,7 @@ export default function CollectiveOrderDetail() {
         deliveryCostMode: offerForm.deliveryCostMode,
         notes: offerForm.notes || undefined,
       });
-      toast({ title: "Offer submitted", description: "Chemidot and the lead buyer can now review it." });
+      toast({ title: "Offer submitted", description: "The lead buyer can now review it." });
       refetch();
     } catch (err: any) {
       toast({ title: "Offer failed", description: err.message, variant: "destructive" });
@@ -109,10 +117,58 @@ export default function CollectiveOrderDetail() {
   const handleRecommendOffer = async (offerId: number) => {
     try {
       await collectiveAction(`/api/collective-orders/${id}/recommend-offer`, { offerId });
-      toast({ title: "Offer recommended", description: "Chemidot Admin will review and approve the final selection." });
+      toast({ title: "Offer selected", description: "Participants can now confirm their allocations." });
       refetch();
     } catch (err: any) {
-      toast({ title: "Could not recommend offer", description: err.message, variant: "destructive" });
+      toast({ title: "Could not select offer", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleOpenOffers = async () => {
+    try {
+      await collectiveAction(`/api/collective-orders/${id}/open-offers`, {});
+      toast({ title: "Supplier offers opened", description: "Suppliers can now submit offers for this collective order." });
+      refetch();
+    } catch (err: any) {
+      toast({ title: "Could not open offers", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleLockAllocations = async () => {
+    try {
+      await collectiveAction(`/api/collective-orders/${id}/lock-allocations`, {});
+      toast({ title: "Allocations locked", description: "The selected supplier can now confirm availability." });
+      refetch();
+    } catch (err: any) {
+      toast({ title: "Could not lock allocations", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleConfirmAllocation = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await collectiveAction(`/api/collective-orders/${id}/confirm-allocation`, {
+        finalQty: Number(allocationForm.finalQty),
+        deliveryCity: allocationForm.deliveryCity,
+        deliveryAddress: allocationForm.deliveryAddress,
+        contactName: allocationForm.contactName,
+        contactPhone: allocationForm.contactPhone,
+        contactEmail: allocationForm.contactEmail,
+      });
+      toast({ title: "Allocation confirmed", description: "Your committed quantity and delivery details were saved." });
+      refetch();
+    } catch (err: any) {
+      toast({ title: "Could not confirm allocation", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleConfirmAvailability = async () => {
+    try {
+      await collectiveAction(`/api/collective-orders/${id}/confirm-availability`, {});
+      toast({ title: "Availability confirmed", description: "The lead buyer has been notified." });
+      refetch();
+    } catch (err: any) {
+      toast({ title: "Could not confirm availability", description: err.message, variant: "destructive" });
     }
   };
 
@@ -142,6 +198,11 @@ export default function CollectiveOrderDetail() {
   const stage = order.collectiveStage || "gathering";
   const isLeadBuyer = user?.id && order.createdByBuyerId === user.id;
   const canSubmitOffer = userCanSell(user) && stage === "offers_open";
+  const viewerParticipant = order.participants?.find((participant: any) => participant.buyerId === user?.id);
+  const canJoin = ["gathering", "offers_open"].includes(stage);
+  const canConfirmAllocation = !!viewerParticipant && stage === "allocations_confirming" && !!order.selectedOfferId;
+  const canLockAllocations = !!isLeadBuyer && stage === "allocations_confirming" && (order.allocations?.length ?? 0) > 0;
+  const canConfirmAvailability = userCanSell(user) && stage === "allocations_locked" && !!order.isAllocationSharingApproved;
 
   return (
     <MainLayout>
@@ -229,6 +290,15 @@ export default function CollectiveOrderDetail() {
                 <p className="text-sm text-muted-foreground">
                   The collective price applies to the product unit price. Delivery costs may vary based on each buyer's location unless the supplier includes delivery in the offer.
                 </p>
+                {isLeadBuyer && stage === "gathering" && (
+                  <Button type="button" onClick={handleOpenOffers}>Open Supplier Offers</Button>
+                )}
+                {canLockAllocations && (
+                  <Button type="button" onClick={handleLockAllocations}>Lock Allocations</Button>
+                )}
+                {canConfirmAvailability && (
+                  <Button type="button" onClick={handleConfirmAvailability}>Confirm Supplier Availability</Button>
+                )}
               </CardContent>
             </Card>
 
@@ -318,12 +388,50 @@ export default function CollectiveOrderDetail() {
               </Card>
             )}
 
+            {canConfirmAllocation && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Confirm Your Allocation</CardTitle>
+                  <CardDescription>Confirm the final committed quantity and delivery contact for the selected supplier offer.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handleConfirmAllocation} className="grid sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Final Quantity ({order.unit})</Label>
+                      <Input type="number" min="0.01" step="0.01" value={allocationForm.finalQty || viewerParticipant.quantity} onChange={(e) => setAllocationForm(v => ({ ...v, finalQty: e.target.value }))} required />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Delivery City</Label>
+                      <Input value={allocationForm.deliveryCity} onChange={(e) => setAllocationForm(v => ({ ...v, deliveryCity: e.target.value }))} required />
+                    </div>
+                    <div className="sm:col-span-2 space-y-2">
+                      <Label>Delivery Address</Label>
+                      <Input value={allocationForm.deliveryAddress} onChange={(e) => setAllocationForm(v => ({ ...v, deliveryAddress: e.target.value }))} required />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Contact Name</Label>
+                      <Input value={allocationForm.contactName} onChange={(e) => setAllocationForm(v => ({ ...v, contactName: e.target.value }))} required />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Contact Phone</Label>
+                      <Input value={allocationForm.contactPhone} onChange={(e) => setAllocationForm(v => ({ ...v, contactPhone: e.target.value }))} required />
+                    </div>
+                    <div className="sm:col-span-2 space-y-2">
+                      <Label>Contact Email</Label>
+                      <Input type="email" value={allocationForm.contactEmail} onChange={(e) => setAllocationForm(v => ({ ...v, contactEmail: e.target.value }))} required />
+                    </div>
+                    <Button type="submit" className="sm:col-span-2">Confirm Allocation</Button>
+                  </form>
+                </CardContent>
+              </Card>
+            )}
+
             {(order.offers?.length ?? 0) > 0 && (
               <div className="space-y-4">
                 <h2 className="text-xl font-bold">Supplier Offers</h2>
                 <div className="grid gap-4">
                   {order.offers?.map((offer) => (
-                    <Card key={offer.id} className={order.recommendedOfferId === offer.id ? "border-primary" : ""}>
+                    <Card key={offer.id} className={order.selectedOfferId === offer.id || order.recommendedOfferId === offer.id ? "border-primary" : ""}>
                       <CardContent className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
                         <div>
                           <div className="font-semibold">{offer.supplierName}</div>
@@ -334,9 +442,9 @@ export default function CollectiveOrderDetail() {
                             Delivery: {offer.deliveryCostMode.replace(/_/g, " ")} · {offer.incoterms.join(", ") || "Incoterms on request"}
                           </div>
                         </div>
-                        {isLeadBuyer && (
-                          <Button variant={order.recommendedOfferId === offer.id ? "secondary" : "outline"} onClick={() => handleRecommendOffer(offer.id)}>
-                            {order.recommendedOfferId === offer.id ? "Recommended" : "Recommend Offer"}
+                        {isLeadBuyer && stage === "offers_open" && (
+                          <Button variant={order.selectedOfferId === offer.id ? "secondary" : "outline"} onClick={() => handleRecommendOffer(offer.id)}>
+                            {order.selectedOfferId === offer.id ? "Selected" : "Select Offer"}
                           </Button>
                         )}
                       </CardContent>
@@ -382,8 +490,8 @@ export default function CollectiveOrderDetail() {
           <div className="lg:col-span-1">
             <Card className="sticky top-24 shadow-lg border-primary/20">
               <CardHeader className="bg-muted/30 border-b pb-6">
-                <CardTitle>Join Collective Order</CardTitle>
-                <CardDescription>Commit volume to unlock better pricing for everyone.</CardDescription>
+                <CardTitle>{canJoin ? "Join Collective Order" : "Collective Order Progress"}</CardTitle>
+                <CardDescription>{canJoin ? "Commit volume to unlock better pricing for everyone." : "Joining is closed for the current lifecycle stage."}</CardDescription>
               </CardHeader>
               <form onSubmit={handleJoin}>
                 <CardContent className="p-6 space-y-6">
@@ -440,8 +548,8 @@ export default function CollectiveOrderDetail() {
                     </div>
                   )}
 
-                  <MotionCTAButton type="submit" className="w-full" disabled={joinMutation.isPending}>
-                    {joinMutation.isPending ? "Processing..." : "Commit Volume"}
+                  <MotionCTAButton type="submit" className="w-full" disabled={joinMutation.isPending || !canJoin}>
+                    {joinMutation.isPending ? "Processing..." : canJoin ? "Commit Volume" : "Joining Closed"}
                   </MotionCTAButton>
                   
                   <div className="text-xs text-center text-muted-foreground">

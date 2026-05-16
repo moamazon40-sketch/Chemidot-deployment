@@ -8,7 +8,7 @@ import {
   CheckCircle2, Send, Users, FlaskConical, Info,
 } from "lucide-react";
 import { MotionCTAButton } from "@/components/MotionCTAButton";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { useCreateRfq, useListCategories } from "@workspace/api-client-react";
@@ -35,6 +35,7 @@ const EMPTY = {
 };
 
 type Form = typeof EMPTY;
+const RFQ_PREFILL_KEY = "rfq_prefill";
 
 export default function RFQ() {
   const { user, isLoading: authLoading } = useAuth();
@@ -47,6 +48,18 @@ export default function RFQ() {
   const [step, setStep]         = useState(1);
   const [form, setForm]         = useState<Form>(EMPTY);
   const [submitted, setSubmitted] = useState(false);
+
+  useEffect(() => {
+    const saved = sessionStorage.getItem(RFQ_PREFILL_KEY);
+    if (!saved) return;
+    try {
+      const parsed = JSON.parse(saved) as Partial<Form>;
+      setForm((current) => ({ ...current, ...parsed }));
+      if (user) setStep(3);
+    } catch {
+      sessionStorage.removeItem(RFQ_PREFILL_KEY);
+    }
+  }, [user]);
 
   const f = (key: keyof Form) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
@@ -88,8 +101,8 @@ export default function RFQ() {
   const next = () => { if (validate(step)) setStep(s => Math.min(s + 1, 3)); };
 
   const handleGuestRedirect = () => {
-    sessionStorage.setItem("rfq_prefill", JSON.stringify(form));
-    navigate("/auth/register");
+    sessionStorage.setItem(RFQ_PREFILL_KEY, JSON.stringify(form));
+    navigate("/auth/register?return=/rfq");
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -108,7 +121,11 @@ export default function RFQ() {
         categoryId:          form.categoryId ? parseInt(form.categoryId) : undefined,
       },
     }, {
-      onSuccess: () => { setSubmitted(true); window.scrollTo({ top: 0, behavior: "smooth" }); },
+      onSuccess: () => {
+        sessionStorage.removeItem(RFQ_PREFILL_KEY);
+        setSubmitted(true);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      },
       onError:   () => toast({ title: "Failed to submit RFQ", description: "Please try again.", variant: "destructive" }),
     });
   };
@@ -522,7 +539,7 @@ export default function RFQ() {
                         <Send className="w-4 h-4" />
                         Create Account & Send RFQ
                       </MotionCTAButton>
-                      <Link href="/auth/login">
+                      <Link href="/auth/login?return=/rfq">
                         <Button type="button" variant="outline" className="w-full sm:w-auto">
                           Already have an account?
                         </Button>

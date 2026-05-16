@@ -532,6 +532,31 @@ router.post("/collective-orders/:id/offers", requireAuth, requireCanSell, asyncH
   });
 }));
 
+router.post("/collective-orders/:id/open-offers", requireAuth, requireCanBuy, asyncHandler(async (req, res) => {
+  const user = (req as any).user;
+  const id = parseInt(String(req.params.id));
+  const [co] = await db.select().from(collectiveOrdersTable).where(eq(collectiveOrdersTable.id, id)).limit(1);
+  if (!co) {
+    res.status(404).json({ message: "Collective order not found" });
+    return;
+  }
+  if (co.createdByBuyerId !== user.id) {
+    res.status(403).json({ message: "Only the lead buyer can open supplier offers." });
+    return;
+  }
+  if (co.status !== "open" || co.collectiveStage !== "gathering") {
+    res.status(400).json({ message: "Supplier offers can only be opened while the order is gathering buyers." });
+    return;
+  }
+
+  const [updated] = await db.update(collectiveOrdersTable)
+    .set({ collectiveStage: "offers_open", updatedAt: new Date() })
+    .where(eq(collectiveOrdersTable.id, id))
+    .returning();
+
+  res.json(updated);
+}));
+
 router.post("/collective-orders/:id/recommend-offer", requireAuth, requireCanBuy, asyncHandler(async (req, res) => {
   const user = (req as any).user;
   const id = parseInt(String(req.params.id));
@@ -547,7 +572,11 @@ router.post("/collective-orders/:id/recommend-offer", requireAuth, requireCanBuy
     return;
   }
   if (co.createdByBuyerId !== user.id) {
-    res.status(403).json({ message: "Only the lead buyer can recommend a supplier offer." });
+    res.status(403).json({ message: "Only the lead buyer can select a supplier offer." });
+    return;
+  }
+  if (co.collectiveStage !== "offers_open") {
+    res.status(400).json({ message: "Supplier offers must be open before selecting an offer." });
     return;
   }
   const [offer] = await db.select().from(collectiveOrderOffersTable)
@@ -559,9 +588,67 @@ router.post("/collective-orders/:id/recommend-offer", requireAuth, requireCanBuy
   }
 
   const [updated] = await db.update(collectiveOrdersTable)
-    .set({ recommendedOfferId: offer.id, updatedAt: new Date() })
+    .set({
+      recommendedOfferId: offer.id,
+      selectedOfferId: offer.id,
+      supplierId: offer.supplierId,
+      currentPrice: offer.unitPrice,
+      collectiveStage: "allocations_confirming",
+      updatedAt: new Date(),
+    })
     .where(eq(collectiveOrdersTable.id, id))
     .returning();
+
+  const participants = await db.select().from(collectiveOrderParticipantsTable)
+    .where(eq(collectiveOrderParticipantsTable.collectiveOrderId, id));
+  await Promise.all(participants.map((participant) => notifyUser(
+    participant.buyerId,
+    "Supplier offer selected",
+    `The lead buyer selected a supplier offer for ${co.productName}. Please confirm your allocation.`,
+    id,
+  )));
+
+  res.json(updated);
+}));
+
+router.post("/collective-orders/:id/lock-allocations", requireAuth, requireCanBuy, asyncHandler(async (req, res) => {
+  const user = (req as any).user;
+  const id = parseInt(String(req.params.id));
+  const [co] = await db.select().from(collectiveOrdersTable).where(eq(collectiveOrdersTable.id, id)).limit(1);
+  if (!co) {
+    res.status(404).json({ message: "Collective order not found" });
+    return;
+  }
+  if (co.createdByBuyerId !== user.id) {
+    res.status(403).json({ message: "Only the lead buyer can lock allocations." });
+    return;
+  }
+  if (co.collectiveStage !== "allocations_confirming") {
+    res.status(400).json({ message: "Allocations can only be locked after selecting a supplier offer." });
+    return;
+  }
+
+  const allocations = await db.select().from(collectiveOrderAllocationsTable)
+    .where(eq(collectiveOrderAllocationsTable.collectiveOrderId, id));
+  if (allocations.length === 0) {
+    res.status(400).json({ message: "At least one buyer allocation must be confirmed before locking." });
+    return;
+  }
+
+  const [updated] = await db.update(collectiveOrdersTable)
+    .set({
+      isAllocationLocked: true,
+      isAllocationSharingApproved: true,
+      collectiveStage: "allocations_locked",
+      updatedAt: new Date(),
+    })
+    .where(eq(collectiveOrdersTable.id, id))
+    .returning();
+
+  if (co.supplierId) {
+    const [supplier] = await db.select().from(suppliersTable).where(eq(suppliersTable.id, co.supplierId)).limit(1);
+    await notifyUser(supplier?.userId, "Allocations ready for supplier confirmation", `${co.productName} allocations are locked and ready for availability confirmation.`, id);
+  }
 
   res.json(updated);
 }));
